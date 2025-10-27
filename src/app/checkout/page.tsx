@@ -94,10 +94,7 @@ export default function CheckoutPage() {
           <Label>Phone Number *</Label>
           <Input placeholder="03XXXXXXXXX" value={number} onChange={(e) => setNumber(e.target.value)} />
         </div>
-        <div>
-          <Label>Email (optional)</Label>
-          <Input placeholder="Email Address" value={email} onChange={(e) => setEmail(e.target.value)} />
-        </div>
+   
 
         {/* ✅ Searchable City */}
         <div>
