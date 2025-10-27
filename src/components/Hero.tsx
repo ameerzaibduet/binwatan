@@ -5,20 +5,32 @@ import { motion } from "framer-motion"
 
 export default function Hero() {
   return (
-    <section className="relative w-full h-[60vh] md:h-[70vh] flex items-center justify-center bg-white overflow-hidden">
+    <section
+      className="
+        relative w-full 
+        h-[45vh] sm:h-[55vh] md:h-[70vh] 
+        flex items-center justify-center 
+        bg-white overflow-hidden 
+        px-0 sm:px-4
+      "
+    >
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 1 }}
-        className="relative w-[300px] sm:w-[450px] md:w-[600px] lg:w-[700px]"
+        className="
+          relative 
+          w-[90%] sm:w-[420px] md:w-[600px] lg:w-[700px]
+          mx-auto
+        "
       >
         <Image
-          src="/banner.png" // <-- replace with your actual white-background bike image
+          src="/banner.png"
           alt="Bin Watan Bike Seat Cover"
           width={700}
           height={500}
           priority
-          className="object-contain drop-shadow-[0_6px_15px_rgba(0,0,0,0.25)]"
+          className="object-contain w-full h-auto"
         />
       </motion.div>
     </section>
