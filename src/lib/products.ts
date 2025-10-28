@@ -17,7 +17,7 @@ export const Products = [
       { name: "brown", image: "/images/4pocketBrown.png" },
       { name: "silver", image: "/images/silver.jpeg"},
       { name: "darkBrown", image: "/images/darkbrown.jpeg"},
-      { name: "gray", image: "/images/gray.png"},
+      { name: "gray", image: "/images/gray.jpeg"},
       { name: "red", image: "/images/4pocketred.png"}
     
     ]
@@ -40,7 +40,7 @@ export const Products = [
       { name: "brown", image: "/images/4pocketBrown.png" },
       { name: "silver", image: "/images/silver.jpeg"},
       { name: "darkBrown", image: "/images/darkbrown.jpeg"},
-      { name: "gray", image: "/images/gray.png"},
+      { name: "gray", image: "/images/gray.jpeg"},
       { name: "red", image: "/images/4pocketred.png"}
     
     ]
@@ -63,7 +63,7 @@ export const Products = [
       { name: "brown", image: "/images/4pocketBrown.png" },
       { name: "silver", image: "/images/silver.jpeg"},
       { name: "darkBrown", image: "/images/darkbrown.jpeg"},
-      { name: "gray", image: "/images/gray.png"},
+      { name: "gray", image: "/images/gray.jpeg"},
       { name: "red", image: "/images/4pocketred.png"}
     
     ]
@@ -87,7 +87,7 @@ export const Products = [
       { name: "blue", image: "/images/4pocketBlue.png" },
       { name: "silver", image: "/images/silver.jpeg"},
       { name: "darkBrown", image: "/images/darkbrown.jpeg"},
-      { name: "gray", image: "/images/gray.png"},
+      { name: "gray", image: "/images/gray.jpeg"},
       { name: "red", image: "/images/4pocketred.png"}
     
     ]

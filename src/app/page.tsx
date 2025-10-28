@@ -6,17 +6,13 @@ import { useEffect, useState } from "react"
 import { motion, Variants } from "framer-motion"
 import { Product } from "@/types/product"
 import { Products } from "@/lib/products"
-import Link from "next/link"
 
 export default function HomePage() {
   const [products, setProducts] = useState<Product[]>([])
-  const [categories, setCategories] = useState<string[]>([])
 
   const loadProducts = () => {
     const data = Products
     setProducts(data)
-    const uniqueCategories = [...new Set(data.map((p) => p.category))]
-    setCategories(uniqueCategories)
   }
 
   useEffect(() => {
@@ -45,49 +41,9 @@ export default function HomePage() {
 
   return (
     <main className="min-h-screen bg-gray-50 text-gray-900 relative">
-      {/* ✅ Hero Section with Category Buttons Overlay */}
+      {/* ✅ Hero Section */}
       <section className="relative bg-white">
         <Hero />
-
-        {/* ✅ Full-width Category Bar Over Banner */}
-        <div className="absolute top-0 left-0 w-full flex justify-center z-20">
-          <div
-            className="
-              w-full bg-black/30 backdrop-blur-sm py-3
-              flex justify-center
-              border-b border-white/20
-            "
-          >
-            <div
-              className="
-                flex flex-wrap justify-center gap-3 sm:gap-4 
-                max-w-6xl px-6
-              "
-            >
-              {categories.map((cat) => (
-                <motion.div
-                  key={cat}
-                  whileHover={{ scale: 1.08 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <Link
-                    href={`/category/${encodeURIComponent(cat)}`}
-                    className="
-                      px-5 py-2 sm:py-2.5
-                      bg-gradient-to-r from-red-600 to-red-800
-                      text-white font-medium text-sm sm:text-base
-                      rounded-full shadow-md
-                      hover:from-red-700 hover:to-red-900 
-                      transition-all duration-300
-                    "
-                  >
-                    {cat}
-                  </Link>
-                </motion.div>
-              ))}
-            </div>
-          </div>
-        </div>
       </section>
 
       {/* ✅ Product List */}
@@ -111,8 +67,14 @@ export default function HomePage() {
           viewport={{ once: true, amount: 0.2 }}
         >
           {products.length > 0 ? (
-            products.map((product) => (
-              <motion.div key={product.id} variants={cardVariants}>
+            products.map((product, index) => (
+              <motion.div
+                key={product.id}
+                variants={cardVariants}
+                initial={index < 4 ? "visible" : "hidden"} // ✅ Show first row by default
+                whileInView="visible"
+                viewport={{ once: true, amount: 0.2 }}
+              >
                 <ProductCard product={product} />
               </motion.div>
             ))

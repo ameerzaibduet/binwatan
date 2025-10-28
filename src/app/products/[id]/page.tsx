@@ -4,6 +4,7 @@ import { use } from 'react'
 import { useState } from 'react'
 import { notFound, useRouter } from 'next/navigation'
 import Image from 'next/image'
+import Link from 'next/link'
 import { Products } from '@/lib/products'
 import { Button } from '@/components/ui/button'
 import { useCart } from '@/lib/use-cart'
@@ -15,7 +16,9 @@ type Props = {
 }
 
 export default function ProductDetailPage({ params }: Props) {
+  // ✅ unwrap the params Promise using React.use()
   const { id } = use(params)
+
   const product = Products.find((p) => p.id === id)
   const router = useRouter()
   const { addToCart } = useCart()
@@ -38,19 +41,18 @@ export default function ProductDetailPage({ params }: Props) {
     router.push('/checkout')
   }
 
-  // 🔹 Get other products from the same category
   const relatedProducts = Products.filter(
     (p) => p.category === product.category && p.id !== product.id
   )
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-10">
-      {/* Product Details Section */}
+      {/* Product Details */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-start">
-        {/* Product Image with Zoom */}
+        {/* Image with Zoom */}
         <div className="relative overflow-hidden rounded-lg group shadow-lg" style={{ height: 400 }}>
           <Image
-            src={selectedColor?.image || product.colors[0].image}
+            src={selectedColor?.image || product.colors?.[0]?.image || '/placeholder.jpg'}
             alt={product.name}
             width={500}
             height={400}
@@ -63,7 +65,7 @@ export default function ProductDetailPage({ params }: Props) {
               e.currentTarget.style.transformOrigin = `${x}% ${y}%`
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.transformOrigin = `center center`
+              e.currentTarget.style.transformOrigin = 'center center'
             }}
           />
         </div>
@@ -71,7 +73,7 @@ export default function ProductDetailPage({ params }: Props) {
         {/* Product Info */}
         <div>
           <h3 className="text-3xl font-bold mb-3">
-            {product.name}{'    '}
+            {product.name}{' '}
             <span className="text-2xl text-blue-600 mb-6">PKR {product.price}</span>
           </h3>
 
@@ -80,8 +82,19 @@ export default function ProductDetailPage({ params }: Props) {
             {product.description.split('\n').map((line, i) => (
               <li key={i} className="flex items-center gap-2">
                 <span className="text-green-600">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="w-5 h-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 13l4 4L19 7"
+                    />
                   </svg>
                 </span>
                 <span>{line.trim()}</span>
@@ -99,7 +112,7 @@ export default function ProductDetailPage({ params }: Props) {
                     key={color.name}
                     onClick={() => setSelectedColor(color)}
                     className={clsx(
-                      'relative border-2 rounded-md overflow-hidden',
+                      'relative border-2 rounded-md overflow-hidden cursor-pointer hover:scale-105 transition-transform duration-200',
                       selectedColor?.name === color.name ? 'border-black' : 'border-gray-300'
                     )}
                     title={color.name}
@@ -140,29 +153,27 @@ export default function ProductDetailPage({ params }: Props) {
         </div>
       </div>
 
-      {/* 🔹 Related Products Section */}
+      {/* Related Products */}
       {relatedProducts.length > 0 && (
         <div className="mt-16">
           <h3 className="text-2xl font-bold mb-6">Related Products</h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
             {relatedProducts.map((item) => (
-              <div
-                key={item.id}
-                onClick={() => router.push(`/product/${item.id}`)}
-                className="cursor-pointer border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition"
-              >
-                <Image
-                  src={item.colors?.[0]?.image || '/placeholder.jpg'}
-                  alt={item.name}
-                  width={300}
-                  height={250}
-                  className="w-full h-48 object-cover"
-                />
-                <div className="p-3">
-                  <h4 className="font-semibold text-sm mb-1">{item.name}</h4>
-                  <p className="text-blue-600 text-sm font-medium">PKR {item.price}</p>
+              <Link href={`/products/${item.id}`} key={item.id}>
+                <div className="cursor-pointer border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition">
+                  <Image
+                    src={item.colors?.[0]?.image || '/placeholder.jpg'}
+                    alt={item.name}
+                    width={300}
+                    height={250}
+                    className="w-full h-48 object-cover"
+                  />
+                  <div className="p-3">
+                    <h4 className="font-semibold text-sm mb-1">{item.name}</h4>
+                    <p className="text-blue-600 text-sm font-medium">PKR {item.price}</p>
+                  </div>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         </div>

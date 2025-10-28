@@ -1,82 +1,61 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { useCart } from "@/lib/use-cart"
-import { useAuth } from "@/lib/use-auth"
 import { useCartUI } from "@/lib/use-cart-ui"
-import { useState } from "react"
-import {
-  ShoppingCart,
-  Menu,
-  Home,
-  ListOrdered,
-  LogOut,
-  UserCheck,
-  UserPlus,
-} from "lucide-react"
+import { useState, useEffect } from "react"
+import { ShoppingCart, Menu, Home, ListOrdered } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import * as Popover from "@radix-ui/react-popover"
 import CartDrawer from "./CartDrawer"
-import { Input } from "@/components/ui/input"
 import Image from "next/image"
+import { Products } from "@/lib/products"
 
 export default function Navbar() {
   const pathname = usePathname()
-  const router = useRouter()
   const { cart } = useCart()
-  const { isLoggedIn } = useAuth()
   const { isCartOpen, openCart, closeCart } = useCartUI()
-  const [search, setSearch] = useState("")
   const [popoverOpen, setPopoverOpen] = useState(false)
+  const [categories, setCategories] = useState<string[]>([])
 
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0)
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (search.trim()) {
-      router.push(`/products?search=${search}`)
-    }
-  }
+  useEffect(() => {
+    const data = Products
+    const uniqueCategories = [...new Set(data.map((p) => p.category))]
+    setCategories(uniqueCategories)
+  }, [])
 
   const navItems = [
-    { name: "Home", href: "/", icon: <Home size={18} /> },
-    { name: "Orders", href: "/orders", icon: <ListOrdered size={18} /> },
+    { name: "Home", href: "/", icon: <Home size={16} /> },
+    { name: "My Orders", href: "/orders", icon: <ListOrdered size={16} /> },
   ]
 
   return (
-    <header className="bg-white shadow sticky top-0 z-50">
-      <div className="max-w-6xl mx-auto px-4 py-4 flex flex-nowrap md:flex-wrap justify-between items-center gap-4 overflow-x-auto">
+    <header className="bg-gradient-to-r from-black to-red-800 shadow-md sticky top-0 z-50">
+      <div className="max-w-6xl mx-auto px-4 py-2.5 flex flex-nowrap md:flex-wrap justify-between items-center gap-4 overflow-x-auto">
         {/* Logo */}
         <Link href="/" className="text-2xl font-bold tracking-tight shrink-0">
           <Image
-            alt="Khan."
-            src="/images/binwatan.jpeg"
-            width={80}
+            alt="Bin Watan"
+            src="/images/binwatan.png"
+            width={70}
             height={20}
-            className="object-contain"
+            className="object-contain rounded-md"
           />
         </Link>
 
-        {/* Search */}
-        <form onSubmit={handleSearch} className="flex-grow max-w-[180px] sm:max-w-md min-w-0">
-          <Input
-            placeholder="Search products..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </form>
-
         {/* Desktop Menu */}
-        <nav className="hidden md:flex gap-6 items-center">
+        <nav className="hidden md:flex gap-5 items-center">
           {navItems.map((item) => (
             <Link
               key={item.name}
               href={item.href}
-              className={`flex items-center gap-1 text-sm font-medium ${
+              className={`flex items-center gap-1 text-sm font-medium transition-colors ${
                 pathname === item.href
-                  ? "text-blue-600"
-                  : "text-gray-700 hover:text-black"
+                  ? "text-white border-b border-white pb-0.5"
+                  : "text-gray-200 hover:text-white"
               }`}
             >
               {item.icon}
@@ -84,49 +63,28 @@ export default function Navbar() {
             </Link>
           ))}
 
-          {isLoggedIn ? (
+          {/* Category Links */}
+          {categories.map((cat) => (
             <Link
-              href="/logout"
-              className={`flex items-center gap-1 text-sm font-medium ${
-                pathname === "/logout"
-                  ? "text-blue-600"
-                  : "text-gray-700 hover:text-black"
+              key={cat}
+              href={`/category/${encodeURIComponent(cat)}`}
+              className={`text-sm font-medium border border-gray-400/30 text-gray-200 hover:text-white hover:border-white/50 px-2.5 py-1 rounded-full transition-all ${
+                pathname === `/category/${cat}` ? "bg-white text-black" : ""
               }`}
             >
-              <LogOut size={18} />
-              Logout
+              {cat}
             </Link>
-          ) : (
-            <>
-              <Link
-                href="/login"
-                className={`flex items-center gap-1 text-sm font-medium ${
-                  pathname === "/login"
-                    ? "text-blue-600"
-                    : "text-gray-700 hover:text-black"
-                }`}
-              >
-                <UserCheck size={18} />
-                Login
-              </Link>
-              <Link
-                href="/register"
-                className={`flex items-center gap-1 text-sm font-medium ${
-                  pathname === "/register"
-                    ? "text-blue-600"
-                    : "text-gray-700 hover:text-black"
-                }`}
-              >
-                <UserPlus size={18} />
-                Signup
-              </Link>
-            </>
-          )}
+          ))}
 
-          <Button variant="ghost" onClick={openCart} className="relative">
-            <ShoppingCart size={20} />
+          {/* Cart */}
+          <Button
+            variant="ghost"
+            onClick={openCart}
+            className="relative text-white hover:text-gray-200"
+          >
+            <ShoppingCart size={18} />
             {totalItems > 0 && (
-              <span className="absolute -top-2 -right-2 text-xs bg-red-500 text-white w-5 h-5 rounded-full flex items-center justify-center">
+              <span className="absolute -top-1.5 -right-2 text-xs bg-red-500 text-white w-4.5 h-4.5 rounded-full flex items-center justify-center">
                 {totalItems}
               </span>
             )}
@@ -134,11 +92,15 @@ export default function Navbar() {
         </nav>
 
         {/* Mobile Menu */}
-        <div className="md:hidden flex items-center gap-3 shrink-0">
-          <Button variant="ghost" onClick={openCart} className="relative">
+        <div className="md:hidden flex items-center gap-2 shrink-0 text-white">
+          <Button
+            variant="ghost"
+            onClick={openCart}
+            className="relative text-white hover:text-gray-200"
+          >
             <ShoppingCart size={20} />
             {totalItems > 0 && (
-              <span className="absolute -top-2 -right-2 text-xs bg-red-500 text-white w-5 h-5 rounded-full flex items-center justify-center">
+              <span className="absolute -top-1.5 -right-2 text-xs bg-red-500 text-white w-4.5 h-4.5 rounded-full flex items-center justify-center">
                 {totalItems}
               </span>
             )}
@@ -146,71 +108,36 @@ export default function Navbar() {
 
           <Popover.Root open={popoverOpen} onOpenChange={setPopoverOpen}>
             <Popover.Trigger asChild>
-              <Button variant="ghost">
-                <Menu />
+              <Button variant="ghost" className="text-white hover:text-gray-200">
+                <Menu size={20} />
               </Button>
             </Popover.Trigger>
 
             <Popover.Portal>
-              <Popover.Content className="bg-white border p-4 rounded shadow-md w-40 z-50">
+              <Popover.Content className="bg-white border p-4 rounded shadow-md w-48 z-50">
                 <div className="flex flex-col gap-3">
                   {navItems.map((item) => (
                     <Link
                       key={item.name}
                       href={item.href}
                       onClick={() => setPopoverOpen(false)}
-                      className={`flex items-center gap-1 text-sm font-medium ${
-                        pathname === item.href
-                          ? "text-blue-600"
-                          : "text-gray-700 hover:text-black"
-                      }`}
+                      className="flex items-center gap-1 text-sm font-medium text-gray-700 hover:text-black"
                     >
                       {item.icon}
                       {item.name}
                     </Link>
                   ))}
-
-                  {isLoggedIn ? (
+                  <hr />
+                  {categories.map((cat) => (
                     <Link
-                      href="/logout"
+                      key={cat}
+                      href={`/category/${encodeURIComponent(cat)}`}
                       onClick={() => setPopoverOpen(false)}
-                      className={`flex items-center gap-1 text-sm font-medium ${
-                        pathname === "/logout"
-                          ? "text-blue-600"
-                          : "text-gray-700 hover:text-black"
-                      }`}
+                      className="text-sm font-medium text-gray-700 hover:text-black"
                     >
-                      <LogOut size={18} />
-                      Logout
+                      {cat}
                     </Link>
-                  ) : (
-                    <>
-                      <Link
-                        href="/login"
-                        onClick={() => setPopoverOpen(false)}
-                        className={`flex items-center gap-1 text-sm font-medium ${
-                          pathname === "/login"
-                            ? "text-blue-600"
-                            : "text-gray-700 hover:text-black"
-                        }`}
-                      >
-                        <UserCheck size={18} />
-                        Login
-                      </Link>
-                      <Link
-                        href="/register"
-                        onClick={() => setPopoverOpen(false)}
-                        className={`flex items-center gap-1 text-sm font-medium ${
-                          pathname === "/register"
-                            ? "text-blue-600"
-                            : "text-gray-700 hover:text-black"
-                        }`}
-                      >
-                        <UserPlus size={18} />
-                        Signup
-                      </Link>
-                    </>
-                  )}
+                  ))}
                 </div>
               </Popover.Content>
             </Popover.Portal>
