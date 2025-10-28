@@ -173,7 +173,7 @@ export const Products = [
  1-year warranty`,
     quantity: 1,
     colors: [
-      { name: "red", image: "/images/darkbrown.jpeg", default: true },
+      { name: "darkbrown", image: "/images/darkbrown.jpeg", default: true },
       { name: "black", image: "/images/4pocketBlack.png" },
       { name: "green", image: "/images/4pocketGreen.png" },
       { name: "brown", image: "/images/4pocketBrown.png" },
