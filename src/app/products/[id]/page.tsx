@@ -30,12 +30,12 @@ export default function ProductDetailPage({ params }: Props) {
   const [selectedCC, setSelectedCC] = useState("70cc")
 
   const handleAddToCart = () => {
-    addToCart({ ...product, quantity: 1, color: selectedColor?.name, bikeType: selectedCC })
+    addToCart({ ...product, quantity: 1, color: selectedColor?.name})
     openCart()
   }
 
   const handleBuyNow = () => {
-    addToCart({ ...product, quantity: 1, color: selectedColor?.name, bikeType: selectedCC })
+    addToCart({ ...product, quantity: 1, color: selectedColor?.name })
     closeCart()
     router.push("/checkout")
   }
