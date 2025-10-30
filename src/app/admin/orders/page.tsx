@@ -15,6 +15,7 @@ export default function AdminOrdersPage() {
   const [loading, setLoading] = useState(true)
   const [editId, setEditId] = useState<number | null>(null)
   const [editedData, setEditedData] = useState<any>({})
+  const [popup, setPopup] = useState<{ type: string; id: number | null } | null>(null)
 
   const router = useRouter()
 
@@ -30,7 +31,10 @@ export default function AdminOrdersPage() {
 
   const fetchOrders = async () => {
     setStatus("Loading orders...")
-    const { data, error } = await supabaseClient.from("orders").select("*").order("created_at", { ascending: false })
+    const { data, error } = await supabaseClient
+      .from("orders")
+      .select("*")
+      .order("created_at", { ascending: false })
 
     if (error) {
       console.error("Failed to fetch orders:", error)
@@ -43,24 +47,33 @@ export default function AdminOrdersPage() {
     setLoading(false)
   }
 
-  const dispatchOrder = async (id: number) => {
-    setStatus(`Dispatching order...`)
-    const { error } = await supabaseClient.from("orders").update({ dispatched: true }).eq("id", id)
-    if (error) {
-      setStatus("Failed to dispatch order")
-    } else {
-      fetchOrders()
-    }
+  const confirmAction = (type: string, id: number) => {
+    setPopup({ type, id })
   }
 
-  const deleteOrder = async (id: number) => {
-    setStatus(`Deleting order...`)
-    const { error } = await supabaseClient.from("orders").delete().eq("id", id)
-    if (error) {
-      setStatus("Failed to delete order")
-    } else {
-      fetchOrders()
+  const closePopup = () => {
+    setPopup(null)
+  }
+
+  const handleConfirm = async () => {
+    if (!popup) return
+    const { type, id } = popup
+
+    if (type === "delete") {
+      setStatus("Deleting order...")
+      const { error } = await supabaseClient.from("orders").delete().eq("id", id!)
+      if (error) setStatus("Failed to delete order")
+      else fetchOrders()
     }
+
+    if (type === "dispatch") {
+      setStatus("Dispatching order...")
+      const { error } = await supabaseClient.from("orders").update({ dispatched: true }).eq("id", id!)
+      if (error) setStatus("Failed to dispatch order")
+      else fetchOrders()
+    }
+
+    closePopup()
   }
 
   const startEdit = (order: any) => {
@@ -94,16 +107,22 @@ export default function AdminOrdersPage() {
 
   if (loading) return <LoadingSpinner message="Loading orders..." />
   if (!isAllowed) return null
-   const totalOrders = orders.length
+
+  const totalOrders = orders.length
   const dispatchedOrders = orders.filter((o) => o.dispatched).length
   const unbookedOrders = totalOrders - dispatchedOrders
+
   return (
-    <div className="max-w-7xl mx-auto px-4 py-10">
+    <div className="max-w-7xl mx-auto px-4 py-10 relative">
+      {/* Header */}
       <div className="flex justify-between items-center mb-8 flex-wrap gap-3">
         <h1 className="text-3xl font-bold">Admin - Orders</h1>
-        <Button variant="outline" onClick={handleLogout}>Logout</Button>
+        <Button variant="outline" onClick={handleLogout}>
+          Logout
+        </Button>
       </div>
-       {/* Summary Cards */}
+
+      {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-8">
         <div className="bg-blue-100 text-blue-800 p-4 rounded-lg shadow text-center">
           <h2 className="text-lg font-semibold">Total Orders</h2>
@@ -146,28 +165,45 @@ export default function AdminOrdersPage() {
               </div>
 
               <div className="text-sm text-gray-800 mb-4 space-y-1">
-                <p><strong>Date:</strong> {new Date(order.created_at).toLocaleDateString()}</p>
-                <p><strong>Phone:</strong> {editId === order.id ? (
-                  <input
-                    className="border rounded px-1 py-0.5"
-                    value={editedData.phone}
-                    onChange={(e) => handleChange("phone", e.target.value)}
-                  />
-                ) : order.phone}</p>
-                <p><strong>Address:</strong> {editId === order.id ? (
-                  <input
-                    className="border rounded px-1 py-0.5 w-full"
-                    value={editedData.address}
-                    onChange={(e) => handleChange("address", e.target.value)}
-                  />
-                ) : order.address}</p>
-                <p><strong>City:</strong> {editId === order.id ? (
-                  <input
-                    className="border rounded px-1 py-0.5"
-                    value={editedData.city}
-                    onChange={(e) => handleChange("city", e.target.value)}
-                  />
-                ) : order.city}</p>
+                <p>
+                  <strong>Date:</strong> {new Date(order.created_at).toLocaleDateString()}
+                </p>
+                <p>
+                  <strong>Phone:</strong>{" "}
+                  {editId === order.id ? (
+                    <input
+                      className="border rounded px-1 py-0.5"
+                      value={editedData.phone}
+                      onChange={(e) => handleChange("phone", e.target.value)}
+                    />
+                  ) : (
+                    order.phone
+                  )}
+                </p>
+                <p>
+                  <strong>Address:</strong>{" "}
+                  {editId === order.id ? (
+                    <input
+                      className="border rounded px-1 py-0.5 w-full"
+                      value={editedData.address}
+                      onChange={(e) => handleChange("address", e.target.value)}
+                    />
+                  ) : (
+                    order.address
+                  )}
+                </p>
+                <p>
+                  <strong>City:</strong>{" "}
+                  {editId === order.id ? (
+                    <input
+                      className="border rounded px-1 py-0.5"
+                      value={editedData.city}
+                      onChange={(e) => handleChange("city", e.target.value)}
+                    />
+                  ) : (
+                    order.city
+                  )}
+                </p>
               </div>
 
               {order.items?.length > 0 && (
@@ -188,8 +224,12 @@ export default function AdminOrdersPage() {
                 <div className="flex gap-2">
                   {editId === order.id ? (
                     <>
-                      <Button size="sm" onClick={saveEdit} variant="default" ><Check className="w-4 h-4" /></Button>
-                      <Button size="sm" onClick={cancelEdit} variant="outline"><X className="w-4 h-4" /></Button>
+                      <Button size="sm" onClick={saveEdit} variant="default">
+                        <Check className="w-4 h-4" />
+                      </Button>
+                      <Button size="sm" onClick={cancelEdit} variant="outline">
+                        <X className="w-4 h-4" />
+                      </Button>
                     </>
                   ) : (
                     <Button size="sm" variant="outline" onClick={() => startEdit(order)}>
@@ -200,22 +240,49 @@ export default function AdminOrdersPage() {
                   <Button
                     size="sm"
                     variant={order.dispatched ? "default" : "outline"}
-                    className={order.dispatched ? "bg-green-500 text-white hover:bg-green-600" : "hover:bg-green-100"}
-                    onClick={() => {
-                      if (!order.dispatched) dispatchOrder(order.id)
-                    }}
+                    className={
+                      order.dispatched
+                        ? "bg-green-500 text-white hover:bg-green-600"
+                        : "hover:bg-green-100"
+                    }
+                    onClick={() => !order.dispatched && confirmAction("dispatch", order.id)}
                     disabled={order.dispatched}
                   >
                     {order.dispatched ? "Booked" : "Mark as Booked"}
                   </Button>
 
-                  <Button size="sm" variant="destructive" onClick={() => deleteOrder(order.id)}>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => confirmAction("delete", order.id)}
+                  >
                     <Trash2 className="w-4 h-4" />
                   </Button>
                 </div>
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Confirmation Popup */}
+      {popup && (
+        <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-[90%] max-w-sm text-center">
+            <h2 className="text-lg font-semibold mb-4">
+              {popup.type === "delete"
+                ? "Are you sure you want to delete this order?"
+                : "Mark this order as booked?"}
+            </h2>
+            <div className="flex justify-center gap-4">
+              <Button variant="destructive" onClick={handleConfirm}>
+                Yes
+              </Button>
+              <Button variant="outline" onClick={closePopup}>
+                Cancel
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>

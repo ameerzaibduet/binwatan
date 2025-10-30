@@ -36,6 +36,10 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(false)
   const [cityOpen, setCityOpen] = useState(false)
 
+  // ✅ Bike cover selection (user-end only)
+  const [bike70, setBike70] = useState(false)
+  const [bike125, setBike125] = useState(false)
+
   useEffect(() => setHydrated(true), [])
   if (!hydrated) return null
 
@@ -47,6 +51,7 @@ export default function CheckoutPage() {
       return
     }
 
+    // ✅ Not sending bikeCover to database (user-end only)
     setLoading(true)
 
     const order = {
@@ -94,7 +99,6 @@ export default function CheckoutPage() {
           <Label>Phone Number *</Label>
           <Input placeholder="03XXXXXXXXX" value={number} onChange={(e) => setNumber(e.target.value)} />
         </div>
-   
 
         {/* ✅ Searchable City */}
         <div>
@@ -145,6 +149,31 @@ export default function CheckoutPage() {
             onChange={(e) => setAddress(e.target.value)}
           />
         </div>
+
+        {/* ✅ Bike Cover Type Selection (User-end only) */}
+        <div>
+          <Label>Select Bike Cover Type (optional)</Label>
+          <div className="flex flex-col gap-2 mt-2">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={bike70}
+                onChange={(e) => setBike70(e.target.checked)}
+                className="w-4 h-4 accent-black"
+              />
+              <span>70 CC Bike Cover</span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={bike125}
+                onChange={(e) => setBike125(e.target.checked)}
+                className="w-4 h-4 accent-black"
+              />
+              <span>125 CC Bike Cover</span>
+            </label>
+          </div>
+        </div>
       </div>
 
       {/* ✅ Cart Summary */}
@@ -183,6 +212,3 @@ export default function CheckoutPage() {
     </div>
   )
 }
-
-
-/*password: aV*r&QW-zTW7?-s*/
