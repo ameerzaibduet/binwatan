@@ -13,9 +13,9 @@ export default function AdminOrdersPage() {
   const [isAllowed, setIsAllowed] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [editId, setEditId] = useState<number | null>(null)
+  const [editId, setEditId] = useState<string | null>(null)
   const [editedData, setEditedData] = useState<any>({})
-  const [popup, setPopup] = useState<{ type: string; id: number | null } | null>(null)
+  const [popup, setPopup] = useState<{ type: "delete" | "dispatch"; id: string | null } | null>(null)
 
   const router = useRouter()
 
@@ -47,7 +47,7 @@ export default function AdminOrdersPage() {
     setLoading(false)
   }
 
-  const confirmAction = (type: string, id: number) => {
+  const confirmAction = (type: "delete" | "dispatch", id: string) => {
     setPopup({ type, id })
   }
 
@@ -60,17 +60,90 @@ export default function AdminOrdersPage() {
     const { type, id } = popup
 
     if (type === "delete") {
-      setStatus("Deleting order...")
-      const { error } = await supabaseClient.from("orders").delete().eq("id", id!)
-      if (error) setStatus("Failed to delete order")
-      else fetchOrders()
+      try {
+        setStatus("Deleting order...")
+        const { error } = await supabaseClient.from("orders").delete().eq("id", id!)
+        if (error) throw error
+        fetchOrders()
+        setStatus("Order deleted successfully.")
+      } catch (err: any) {
+        console.error("Delete failed:", err)
+        setStatus(`Delete failed: ${err.message || err}`)
+      }
     }
 
     if (type === "dispatch") {
-      setStatus("Dispatching order...")
-      const { error } = await supabaseClient.from("orders").update({ dispatched: true }).eq("id", id!)
-      if (error) setStatus("Failed to dispatch order")
-      else fetchOrders()
+      setStatus("Booking order on PostEx...")
+
+      const order = orders.find((o) => o.id === id)
+      if (!order) return
+
+      try {
+        const payload = {
+          orderRefNumber: "404",
+          invoicePayment: order.total,
+          orderDetail:
+            order.items?.map((i: any) =>{let name = i.name
+
+      // Replace product names as needed
+      if (name === "Perashot Bike Cover") name = "Perashot 4P"
+      if (name === "Req") name = "Req 4p"
+
+      return `${name} ${i.color || ""} x${i.quantity}`.trim()
+    })
+    .join(", ") || "Order Items",
+          customerName: order.name,
+          customerPhone: order.phone,
+          deliveryAddress: order.address,
+          transactionNotes: "",
+          cityName: order.city || "Karachi",
+          invoiceDivision: 1,
+          items: 1,
+          orderType: "Normal",
+          pickupAddressCode: "001",
+          pickupAddress: "House # 44 5/f1 Orangi Town Karachi",
+        }
+
+        console.log("📦 Sending payload to PostEx:", payload)
+
+        const res = await fetch("/api/postex/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        })
+
+        const data = await res.json()
+        console.log("✅ PostEx API Response:", data)
+
+        if (!res.ok || data.statusCode !== "200") {
+          console.error("PostEx API error:", data)
+          setStatus(`Booking failed: ${data.statusMessage || "Unknown error"}`)
+          closePopup()
+          return
+        }
+
+        // Extract tracking number safely
+        const trackingNumber = data.dist?.trackingNumber || "N/A"
+
+        // Update local state immediately so button changes color/text
+        setOrders((prev) =>
+          prev.map((o) =>
+            o.id === id ? { ...o, dispatched: true, tracking_number: trackingNumber } : o
+          )
+        )
+
+        // Update Supabase
+        const { error } = await supabaseClient
+          .from("orders")
+          .update({ dispatched: true, tracking_number: trackingNumber })
+          .eq("id", id!)
+        if (error) throw error
+
+        setStatus(`Order booked successfully! Tracking: ${trackingNumber}`)
+      } catch (err: any) {
+        console.error("Booking failed:", err)
+        setStatus(`Booking failed: ${err.message || err}`)
+      }
     }
 
     closePopup()
@@ -87,12 +160,15 @@ export default function AdminOrdersPage() {
   }
 
   const saveEdit = async () => {
-    const { error } = await supabaseClient.from("orders").update(editedData).eq("id", editId!)
-    if (error) {
-      alert("Failed to update order")
-    } else {
+    try {
+      const { error } = await supabaseClient.from("orders").update(editedData).eq("id", editId!)
+      if (error) throw error
       fetchOrders()
       cancelEdit()
+      setStatus("Order updated successfully.")
+    } catch (err: any) {
+      console.error("Update failed:", err)
+      setStatus(`Update failed: ${err.message || err}`)
     }
   }
 
@@ -122,6 +198,8 @@ export default function AdminOrdersPage() {
         </Button>
       </div>
 
+      {status && <p className="text-sm text-center mb-4 bg-gray-100 py-2 rounded">{status}</p>}
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-8">
         <div className="bg-blue-100 text-blue-800 p-4 rounded-lg shadow text-center">
@@ -138,8 +216,9 @@ export default function AdminOrdersPage() {
         </div>
       </div>
 
+      {/* Orders */}
       {filteredOrders.length === 0 ? (
-        <p className="text-gray-500">No orders found.</p>
+        <p className="text-gray-500 text-center">No orders found.</p>
       ) : (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {filteredOrders.map((order) => (
@@ -239,12 +318,8 @@ export default function AdminOrdersPage() {
 
                   <Button
                     size="sm"
-                    variant={order.dispatched ? "default" : "outline"}
-                    className={
-                      order.dispatched
-                        ? "bg-green-500 text-white hover:bg-green-600"
-                        : "hover:bg-green-100"
-                    }
+                    variant="outline"
+                    className={order.dispatched ? "bg-green-500 text-white hover:bg-green-600" : ""}
                     onClick={() => !order.dispatched && confirmAction("dispatch", order.id)}
                     disabled={order.dispatched}
                   >
@@ -272,7 +347,7 @@ export default function AdminOrdersPage() {
             <h2 className="text-lg font-semibold mb-4">
               {popup.type === "delete"
                 ? "Are you sure you want to delete this order?"
-                : "Mark this order as booked?"}
+                : "Mark this order as booked (send to PostEx)?"}
             </h2>
             <div className="flex justify-center gap-4">
               <Button variant="destructive" onClick={handleConfirm}>
