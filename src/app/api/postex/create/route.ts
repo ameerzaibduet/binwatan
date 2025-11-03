@@ -7,9 +7,9 @@ export async function POST(request: Request) {
     const body = await request.json()
 
     // Validate required fields
-    const requiredFields = ["customerName", "customerPhone", "deliveryAddress", "cityName", "invoicePayment", "items"]
+    const requiredFields = ["customerName", "customerPhone", "deliveryAddress", "cityName", "invoicePayment", "items", "weight"]
     for (const field of requiredFields) {
-      if (!body[field]) {
+      if (body[field] === undefined || body[field] === null || body[field] === "") {
         return NextResponse.json(
           { statusCode: "400", statusMessage: `Missing required field: ${field}` },
           { status: 400 }
@@ -29,8 +29,10 @@ export async function POST(request: Request) {
       cityName: body.cityName,
       invoiceDivision: 1,
       items: Number(body.items),
+      weight: Number(body.weight), // ✅ Include total weight
       orderType: body.orderType || "Normal",
       pickupAddressCode: body.pickupAddressCode || "001",
+      pickupAddress: body.pickupAddress || "House # 44 5/f1 Orangi Town Karachi",
     }
 
     console.log("📦 Sending payload to PostEx:", payload)
@@ -49,7 +51,7 @@ export async function POST(request: Request) {
 
     console.log("✅ PostEx API Response:", response.data)
 
-    // ✅ Return flat structure (so your frontend logic works)
+    // ✅ Return flat structure (so frontend logic works)
     return NextResponse.json({
       statusCode: response.data.statusCode || "200",
       statusMessage: response.data.statusMessage || "ORDER HAS BEEN CREATED",

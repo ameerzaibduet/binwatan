@@ -64,7 +64,7 @@ export default function AdminOrdersPage() {
         setStatus("Deleting order...")
         const { error } = await supabaseClient.from("orders").delete().eq("id", id!)
         if (error) throw error
-        fetchOrders()
+        await fetchOrders()
         setStatus("Order deleted successfully.")
       } catch (err: any) {
         console.error("Delete failed:", err)
@@ -79,29 +79,32 @@ export default function AdminOrdersPage() {
       if (!order) return
 
       try {
+        // Calculate total weight (fixed 0.3kg per item)
+        const totalWeight = order.items?.reduce((sum: number, item: any) => {
+          return sum + 0.3 * item.quantity
+        }, 0) || 0
+
         const payload = {
           orderRefNumber: "404",
           invoicePayment: order.total,
           orderDetail:
-            order.items?.map((i: any) =>{let name = i.name
-
-      // Replace product names as needed
-      if (name === "Perashot Bike Cover") name = "Perashot 4P"
-      if (name === "Req") name = "Req 4p"
-
-      return `${name} ${i.color || ""} x${i.quantity}`.trim()
-    })
-    .join(", ") || "Order Items",
+            order.items?.map((i: any) => {
+              let name = i.name
+              if (name === "Perashot Bike Cover") name = "Perashot 4P"
+              if (name === "Req") name = "Req 4p"
+              return `${name} ${i.color || ""} x${i.quantity}`.trim()
+            }).join(", ") || "Order Items",
           customerName: order.name,
           customerPhone: order.phone,
           deliveryAddress: order.address,
-          transactionNotes: "",
+          transactionNotes: "Allowed To Open",
           cityName: order.city || "Karachi",
           invoiceDivision: 1,
-          items: 1,
+          items: order.items?.length || 1,
           orderType: "Normal",
           pickupAddressCode: "001",
           pickupAddress: "House # 44 5/f1 Orangi Town Karachi",
+          weight: totalWeight, // ✅ Added total weight
         }
 
         console.log("📦 Sending payload to PostEx:", payload)
@@ -122,11 +125,15 @@ export default function AdminOrdersPage() {
           return
         }
 
-        // Extract tracking number safely
         const trackingNumber = data.dist?.trackingNumber || "N/A"
 
-        // Update local state immediately so button changes color/text
+        // Update local state immediately
         setOrders((prev) =>
+          prev.map((o) =>
+            o.id === id ? { ...o, dispatched: true, tracking_number: trackingNumber } : o
+          )
+        )
+        setFilteredOrders((prev) =>
           prev.map((o) =>
             o.id === id ? { ...o, dispatched: true, tracking_number: trackingNumber } : o
           )
@@ -163,7 +170,7 @@ export default function AdminOrdersPage() {
     try {
       const { error } = await supabaseClient.from("orders").update(editedData).eq("id", editId!)
       if (error) throw error
-      fetchOrders()
+      await fetchOrders()
       cancelEdit()
       setStatus("Order updated successfully.")
     } catch (err: any) {
