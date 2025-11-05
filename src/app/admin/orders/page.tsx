@@ -7,6 +7,15 @@ import { supabaseClient } from "@/utils/supabase/client"
 import LoadingSpinner from "@/components/ui/LoadingSpinner"
 import { Pencil, Trash2, Check, X } from "lucide-react"
 
+interface Order {
+  id: string;
+  customerName: string;
+  customerPhone: string;
+  deliveryAddress: string;
+  dispatched: boolean;
+  [key: string]: any; // allows extra fields if your table has more columns
+}
+
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<any[]>([])
   const [filteredOrders, setFilteredOrders] = useState<any[]>([])
@@ -43,10 +52,10 @@ export default function AdminOrdersPage() {
     } else {
       setOrders(data || [])
       // Default filter = pending (unbooked)
-      const pending = (data || []).filter((o) => !o.dispatched)
-      setFilteredOrders(pending)
-      setFilterStatus("pending")
-      setStatus(null)
+      const pending = (data || []).filter((o: Order) => !o.dispatched)
+        setFilteredOrders(pending)
+        setFilterStatus("pending")
+        setStatus(null)
     }
     setLoading(false)
   }

@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { useCart } from "@/lib/use-cart"
 import { supabase } from "@/lib/supabase"
-import { cities } from "@/lib/cities"
 import { Label } from "@/components/ui/label"
 import {
   Command,
@@ -27,6 +26,7 @@ export default function CheckoutPage() {
   const { cart, clearCart } = useCart()
   const router = useRouter()
 
+  // ✅ State management
   const [hydrated, setHydrated] = useState(false)
   const [name, setName] = useState("")
   const [number, setNumber] = useState("")
@@ -35,13 +35,44 @@ export default function CheckoutPage() {
   const [address, setAddress] = useState("")
   const [loading, setLoading] = useState(false)
   const [cityOpen, setCityOpen] = useState(false)
-
-  // ✅ Bike cover selection (user-end only)
   const [bike70, setBike70] = useState(false)
   const [bike125, setBike125] = useState(false)
 
+  // ✅ Dynamic PostEx cities
+  const [cities, setCities] = useState<string[]>([])
+  const [loadingCities, setLoadingCities] = useState(true)
+
+  // ✅ Hydration
   useEffect(() => setHydrated(true), [])
-  if (!hydrated) return null
+
+  // ✅ Fetch PostEx operational cities
+  useEffect(() => {
+    const fetchCities = async () => {
+      try {
+        const res = await fetch("/api/postex/operational-cities")
+        const data = await res.json()
+
+        if (data?.dist) {
+          const cityNames = data.dist.map(
+            (item: { operationalCityName: string }) => item.operationalCityName
+          )
+          setCities(cityNames)
+        } else {
+          console.error("Unexpected response:", data)
+        }
+      } catch (err) {
+        console.error("Error fetching PostEx cities:", err)
+      } finally {
+        setLoadingCities(false)
+      }
+    }
+
+    fetchCities()
+  }, [])
+
+  if (!hydrated) {
+    return <div className="text-center py-10 text-gray-500">Loading checkout page...</div>
+  }
 
   const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
 
@@ -51,7 +82,6 @@ export default function CheckoutPage() {
       return
     }
 
-    // ✅ Not sending bikeCover to database (user-end only)
     setLoading(true)
 
     const order = {
@@ -73,7 +103,6 @@ export default function CheckoutPage() {
     }
 
     const { error } = await supabase.from("orders").insert([order])
-
     if (error) {
       console.error("Supabase insert error:", error)
       alert("Something went wrong while placing the order.")
@@ -93,14 +122,23 @@ export default function CheckoutPage() {
       <div className="grid gap-4 mb-8">
         <div>
           <Label>Your Name *</Label>
-          <Input placeholder="Full Name" value={name} onChange={(e) => setName(e.target.value)} />
-        </div>
-        <div>
-          <Label>Phone Number *</Label>
-          <Input placeholder="03XXXXXXXXX" value={number} onChange={(e) => setNumber(e.target.value)} />
+          <Input
+            placeholder="Full Name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
         </div>
 
-        {/* ✅ Searchable City */}
+        <div>
+          <Label>Phone Number *</Label>
+          <Input
+            placeholder="03XXXXXXXXX"
+            value={number}
+            onChange={(e) => setNumber(e.target.value)}
+          />
+        </div>
+
+        {/* ✅ Dynamic City Dropdown */}
         <div>
           <Label>City *</Label>
           <Popover open={cityOpen} onOpenChange={setCityOpen}>
@@ -110,30 +148,40 @@ export default function CheckoutPage() {
                 role="combobox"
                 className={cn("w-full justify-between", !city && "text-muted-foreground")}
               >
-                {city || "Select your city"}
+                {city || (loadingCities ? "Loading cities..." : "Select your city")}
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
+
             <PopoverContent side="bottom" align="start" className="w-full p-0 max-h-72 overflow-y-auto z-[100]">
               <Command>
                 <CommandInput placeholder="Search city..." className="h-9" />
                 <CommandList>
                   <CommandGroup>
-                    {cities.map((c) => (
-                      <CommandItem
-                        key={c}
-                        value={c}
-                        onSelect={(value) => {
-                          setCity(value)
-                          setCityOpen(false)
-                        }}
-                      >
-                        <Check
-                          className={cn("mr-2 h-4 w-4", city === c ? "opacity-100" : "opacity-0")}
-                        />
-                        {c}
-                      </CommandItem>
-                    ))}
+                    {loadingCities ? (
+                      <CommandItem disabled>Loading cities...</CommandItem>
+                    ) : cities.length === 0 ? (
+                      <CommandItem disabled>No cities found</CommandItem>
+                    ) : (
+                      cities.map((c) => (
+                        <CommandItem
+                          key={c}
+                          value={c}
+                          onSelect={(value) => {
+                            setCity(value)
+                            setCityOpen(false)
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              city === c ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          {c}
+                        </CommandItem>
+                      ))
+                    )}
                   </CommandGroup>
                 </CommandList>
               </Command>
@@ -150,7 +198,7 @@ export default function CheckoutPage() {
           />
         </div>
 
-        {/* ✅ Bike Cover Type Selection (User-end only) */}
+        {/* ✅ Optional Bike Cover */}
         <div>
           <Label>Select Bike Cover Type (optional)</Label>
           <div className="flex flex-col gap-2 mt-2">
@@ -190,7 +238,9 @@ export default function CheckoutPage() {
                   <p className="text-sm text-gray-500">
                     {item.quantity} × PKR {item.price}
                     {item.color && (
-                      <span className="ml-2">| Color: <strong>{item.color}</strong></span>
+                      <span className="ml-2">
+                        | Color: <strong>{item.color}</strong>
+                      </span>
                     )}
                   </p>
                 </div>
