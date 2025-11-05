@@ -11,11 +11,12 @@ export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<any[]>([])
   const [filteredOrders, setFilteredOrders] = useState<any[]>([])
   const [isAllowed, setIsAllowed] = useState(false)
-  const [status, setStatus] = useState<string | null>(null)
+  const [filterStatus, setFilterStatus] = useState<"all" | "dispatched" | "pending">("pending")
   const [loading, setLoading] = useState(true)
   const [editId, setEditId] = useState<string | null>(null)
   const [editedData, setEditedData] = useState<any>({})
   const [popup, setPopup] = useState<{ type: "delete" | "dispatch"; id: string | null } | null>(null)
+  const [status, setStatus] = useState<string | null>(null)
 
   const router = useRouter()
 
@@ -41,7 +42,10 @@ export default function AdminOrdersPage() {
       setStatus("Failed to load orders.")
     } else {
       setOrders(data || [])
-      setFilteredOrders(data || [])
+      // Default filter = pending (unbooked)
+      const pending = (data || []).filter((o) => !o.dispatched)
+      setFilteredOrders(pending)
+      setFilterStatus("pending")
       setStatus(null)
     }
     setLoading(false)
@@ -80,20 +84,21 @@ export default function AdminOrdersPage() {
 
       try {
         // Calculate total weight (fixed 0.3kg per item)
-        const totalWeight = order.items?.reduce((sum: number, item: any) => {
-          return sum + 0.3 * item.quantity
-        }, 0) || 0
+        const totalWeight =
+          order.items?.reduce((sum: number, item: any) => sum + 0.3 * item.quantity, 0) || 0
 
         const payload = {
           orderRefNumber: "404",
           invoicePayment: order.total,
           orderDetail:
-            order.items?.map((i: any) => {
-              let name = i.name
-              if (name === "Perashot Bike Cover") name = "Perashot 4P"
-              if (name === "Req") name = "Req 4p"
-              return `${name} ${i.color || ""} x${i.quantity}`.trim()
-            }).join(", ") || "Order Items",
+            order.items
+              ?.map((i: any) => {
+                let name = i.name
+                if (name === "Perashot Bike Cover") name = "Perashot 4P"
+                if (name === "Req") name = "Req 4p"
+                return `${name} ${i.color || ""} x${i.quantity}`.trim()
+              })
+              .join(", ") || "Order Items",
           customerName: order.name,
           customerPhone: order.phone,
           deliveryAddress: order.address,
@@ -104,7 +109,7 @@ export default function AdminOrdersPage() {
           orderType: "Normal",
           pickupAddressCode: "001",
           pickupAddress: "House # 44 5/f1 Orangi Town Karachi",
-          weight: totalWeight, // ✅ Added total weight
+          weight: totalWeight,
         }
 
         console.log("📦 Sending payload to PostEx:", payload)
@@ -188,6 +193,14 @@ export default function AdminOrdersPage() {
     router.push("/admin/login")
   }
 
+  // 🔹 Handle filter button clicks
+  const handleFilter = (type: "all" | "dispatched" | "pending") => {
+    setFilterStatus(type)
+    if (type === "all") setFilteredOrders(orders)
+    if (type === "dispatched") setFilteredOrders(orders.filter((o) => o.dispatched))
+    if (type === "pending") setFilteredOrders(orders.filter((o) => !o.dispatched))
+  }
+
   if (loading) return <LoadingSpinner message="Loading orders..." />
   if (!isAllowed) return null
 
@@ -207,23 +220,46 @@ export default function AdminOrdersPage() {
 
       {status && <p className="text-sm text-center mb-4 bg-gray-100 py-2 rounded">{status}</p>}
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-        <div className="bg-blue-100 text-blue-800 p-4 rounded-lg shadow text-center">
+      {/* Filter Buttons */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        <button
+          onClick={() => handleFilter("all")}
+          className={`p-4 rounded-lg shadow text-center border-2 transition ${
+            filterStatus === "all"
+              ? "bg-blue-600 text-white border-blue-600"
+              : "bg-blue-100 text-blue-800 border-blue-100 hover:bg-blue-200"
+          }`}
+        >
           <h2 className="text-lg font-semibold">Total Orders</h2>
           <p className="text-2xl font-bold">{totalOrders}</p>
-        </div>
-        <div className="bg-green-100 text-green-800 p-4 rounded-lg shadow text-center">
+        </button>
+
+        <button
+          onClick={() => handleFilter("dispatched")}
+          className={`p-4 rounded-lg shadow text-center border-2 transition ${
+            filterStatus === "dispatched"
+              ? "bg-green-600 text-white border-green-600"
+              : "bg-green-100 text-green-800 border-green-100 hover:bg-green-200"
+          }`}
+        >
           <h2 className="text-lg font-semibold">Booked Orders</h2>
           <p className="text-2xl font-bold">{dispatchedOrders}</p>
-        </div>
-        <div className="bg-yellow-100 text-yellow-800 p-4 rounded-lg shadow text-center">
-          <h2 className="text-lg font-semibold">Unbooked Orders</h2>
+        </button>
+
+        <button
+          onClick={() => handleFilter("pending")}
+          className={`p-4 rounded-lg shadow text-center border-2 transition ${
+            filterStatus === "pending"
+              ? "bg-yellow-600 text-white border-yellow-600"
+              : "bg-yellow-100 text-yellow-800 border-yellow-100 hover:bg-yellow-200"
+          }`}
+        >
+          <h2 className="text-lg font-semibold">Pending Orders</h2>
           <p className="text-2xl font-bold">{unbookedOrders}</p>
-        </div>
+        </button>
       </div>
 
-      {/* Orders */}
+      {/* Orders List */}
       {filteredOrders.length === 0 ? (
         <p className="text-gray-500 text-center">No orders found.</p>
       ) : (
