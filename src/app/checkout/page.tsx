@@ -37,12 +37,12 @@ export default function CheckoutPage() {
   const [cityOpen, setCityOpen] = useState(false)
   const [bike70, setBike70] = useState(false)
   const [bike125, setBike125] = useState(false)
+  const [errorMsg, setErrorMsg] = useState("")
 
   // ✅ Dynamic PostEx cities
   const [cities, setCities] = useState<string[]>([])
   const [loadingCities, setLoadingCities] = useState(true)
 
-  // ✅ Hydration
   useEffect(() => setHydrated(true), [])
 
   // ✅ Fetch PostEx operational cities
@@ -76,17 +76,32 @@ export default function CheckoutPage() {
 
   const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
 
+  // ✅ Validate & Place Order
   const handlePlaceOrder = async () => {
+    setErrorMsg("")
+
     if (!name || !number || !city || !address || cart.length === 0) {
-      alert("Please fill all required fields and make sure your cart is not empty.")
+      setErrorMsg("Please fill all required fields and make sure your cart is not empty.")
       return
     }
+
+    // ✅ Validate number format (03XXXXXXXXX, 92XXXXXXXXXX, or +923XXXXXXXXX)
+    const phoneRegex = /^(?:\+92|92|0)3\d{9}$/
+    if (!phoneRegex.test(number)) {
+      setErrorMsg("Please enter a valid Pakistani mobile number (e.g., 03XXXXXXXXX or +923XXXXXXXXX).")
+      return
+    }
+
+    // ✅ Normalize number to 03XXXXXXXXX format before saving
+    let normalizedNumber = number
+    if (number.startsWith("+92")) normalizedNumber = "0" + number.slice(3)
+    else if (number.startsWith("92")) normalizedNumber = "0" + number.slice(2)
 
     setLoading(true)
 
     const order = {
       name,
-      phone: number,
+      phone: normalizedNumber,
       email: email || null,
       city,
       address,
@@ -105,7 +120,7 @@ export default function CheckoutPage() {
     const { error } = await supabase.from("orders").insert([order])
     if (error) {
       console.error("Supabase insert error:", error)
-      alert("Something went wrong while placing the order.")
+      setErrorMsg("Something went wrong while placing the order.")
       setLoading(false)
       return
     }
@@ -117,6 +132,13 @@ export default function CheckoutPage() {
   return (
     <div className="max-w-3xl mx-auto p-6">
       <h1 className="text-2xl font-bold mb-6">Checkout</h1>
+
+      {/* ✅ Error Message */}
+      {errorMsg && (
+        <div className="mb-4 text-red-600 bg-red-100 border border-red-200 p-3 rounded-md text-sm">
+          {errorMsg}
+        </div>
+      )}
 
       {/* ✅ Customer Details */}
       <div className="grid gap-4 mb-8">
@@ -132,10 +154,16 @@ export default function CheckoutPage() {
         <div>
           <Label>Phone Number *</Label>
           <Input
-            placeholder="03XXXXXXXXX"
+            placeholder="03XXXXXXXXX or +923XXXXXXXXX"
             value={number}
-            onChange={(e) => setNumber(e.target.value)}
+            onChange={(e) => setNumber(e.target.value.replace(/[^\d+]/g, ""))}
+            maxLength={13}
           />
+          {number && !/^(?:\+92|92|0)3\d{9}$/.test(number) && (
+            <p className="text-xs text-red-500 mt-1">
+              Enter valid Pakistani number (e.g. 03XXXXXXXXX or +923XXXXXXXXX)
+            </p>
+          )}
         </div>
 
         {/* ✅ Dynamic City Dropdown */}
@@ -153,7 +181,11 @@ export default function CheckoutPage() {
               </Button>
             </PopoverTrigger>
 
-            <PopoverContent side="bottom" align="start" className="w-full p-0 max-h-72 overflow-y-auto z-[100]">
+            <PopoverContent
+              side="bottom"
+              align="start"
+              className="w-full p-0 max-h-72 overflow-y-auto z-[100]"
+            >
               <Command>
                 <CommandInput placeholder="Search city..." className="h-9" />
                 <CommandList>
