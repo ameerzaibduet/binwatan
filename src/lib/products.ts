@@ -1,6 +1,6 @@
 export const Products = [
   {
-    id: "1",
+    id: "4",
     name: "Parachute Bike Cover",
     price: 1200 ,
     image: "/images/4pocketBlack.png",
