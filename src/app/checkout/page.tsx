@@ -26,7 +26,6 @@ export default function CheckoutPage() {
   const { cart, clearCart } = useCart()
   const router = useRouter()
 
-  // ✅ State management
   const [hydrated, setHydrated] = useState(false)
   const [name, setName] = useState("")
   const [number, setNumber] = useState("")
@@ -38,20 +37,24 @@ export default function CheckoutPage() {
   const [bike70, setBike70] = useState(false)
   const [bike125, setBike125] = useState(false)
   const [errorMsg, setErrorMsg] = useState("")
-
-  // ✅ Dynamic PostEx cities
   const [cities, setCities] = useState<string[]>([])
   const [loadingCities, setLoadingCities] = useState(true)
 
+  // TikTok Pixel helper
+  const ttqTrack = (eventName: string, params: Record<string, any> = {}) => {
+    if (typeof window !== "undefined" && (window as any).ttq) {
+      ;(window as any).ttq.track(eventName, params)
+    }
+  }
+
   useEffect(() => setHydrated(true), [])
 
-  // ✅ Fetch PostEx operational cities
+  // Fetch PostEx operational cities
   useEffect(() => {
     const fetchCities = async () => {
       try {
         const res = await fetch("/api/postex/operational-cities")
         const data = await res.json()
-
         if (data?.dist) {
           const cityNames = data.dist.map(
             (item: { operationalCityName: string }) => item.operationalCityName
@@ -66,7 +69,6 @@ export default function CheckoutPage() {
         setLoadingCities(false)
       }
     }
-
     fetchCities()
   }, [])
 
@@ -76,7 +78,6 @@ export default function CheckoutPage() {
 
   const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
 
-  // ✅ Validate & Place Order
   const handlePlaceOrder = async () => {
     setErrorMsg("")
 
@@ -85,14 +86,12 @@ export default function CheckoutPage() {
       return
     }
 
-    // ✅ Validate number format (03XXXXXXXXX, 92XXXXXXXXXX, or +923XXXXXXXXX)
     const phoneRegex = /^(?:\+92|92|0)3\d{9}$/
     if (!phoneRegex.test(number)) {
       setErrorMsg("Please enter a valid Pakistani mobile number (e.g., 03XXXXXXXXX or +923XXXXXXXXX).")
       return
     }
 
-    // ✅ Normalize number to 03XXXXXXXXX format before saving
     let normalizedNumber = number
     if (number.startsWith("+92")) normalizedNumber = "0" + number.slice(3)
     else if (number.startsWith("92")) normalizedNumber = "0" + number.slice(2)
@@ -125,6 +124,17 @@ export default function CheckoutPage() {
       return
     }
 
+    // ✅ TikTok Pixel: Track Purchase / CompletePayment
+    ttqTrack("CompletePayment", {
+      value: total,
+      currency: "PKR",
+      contents: cart.map((item) => ({
+        id: item.id,
+        quantity: item.quantity,
+        price: item.price,
+      })),
+    })
+
     clearCart()
     router.push("/order-success")
   }
@@ -133,22 +143,16 @@ export default function CheckoutPage() {
     <div className="max-w-3xl mx-auto p-6">
       <h1 className="text-2xl font-bold mb-6">Checkout</h1>
 
-      {/* ✅ Error Message */}
       {errorMsg && (
         <div className="mb-4 text-red-600 bg-red-100 border border-red-200 p-3 rounded-md text-sm">
           {errorMsg}
         </div>
       )}
 
-      {/* ✅ Customer Details */}
       <div className="grid gap-4 mb-8">
         <div>
           <Label>Your Name *</Label>
-          <Input
-            placeholder="Full Name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
+          <Input placeholder="Full Name" value={name} onChange={(e) => setName(e.target.value)} />
         </div>
 
         <div>
@@ -166,7 +170,6 @@ export default function CheckoutPage() {
           )}
         </div>
 
-        {/* ✅ Dynamic City Dropdown */}
         <div>
           <Label>City *</Label>
           <Popover open={cityOpen} onOpenChange={setCityOpen}>
@@ -181,11 +184,7 @@ export default function CheckoutPage() {
               </Button>
             </PopoverTrigger>
 
-            <PopoverContent
-              side="bottom"
-              align="start"
-              className="w-full p-0 max-h-72 overflow-y-auto z-[100]"
-            >
+            <PopoverContent side="bottom" align="start" className="w-full p-0 max-h-72 overflow-y-auto z-[100]">
               <Command>
                 <CommandInput placeholder="Search city..." className="h-9" />
                 <CommandList>
@@ -204,12 +203,7 @@ export default function CheckoutPage() {
                             setCityOpen(false)
                           }}
                         >
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4",
-                              city === c ? "opacity-100" : "opacity-0"
-                            )}
-                          />
+                          <Check className={cn("mr-2 h-4 w-4", city === c ? "opacity-100" : "opacity-0")} />
                           {c}
                         </CommandItem>
                       ))
@@ -223,40 +217,24 @@ export default function CheckoutPage() {
 
         <div>
           <Label>Complete Address *</Label>
-          <Input
-            placeholder="Street, Area, Nearby Landmark"
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-          />
+          <Input placeholder="Street, Area, Nearby Landmark" value={address} onChange={(e) => setAddress(e.target.value)} />
         </div>
 
-        {/* ✅ Optional Bike Cover */}
         <div>
           <Label>Select Bike Cover Type (optional)</Label>
           <div className="flex flex-col gap-2 mt-2">
             <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={bike70}
-                onChange={(e) => setBike70(e.target.checked)}
-                className="w-4 h-4 accent-black"
-              />
+              <input type="checkbox" checked={bike70} onChange={(e) => setBike70(e.target.checked)} className="w-4 h-4 accent-black" />
               <span>70 CC Bike Cover</span>
             </label>
             <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={bike125}
-                onChange={(e) => setBike125(e.target.checked)}
-                className="w-4 h-4 accent-black"
-              />
+              <input type="checkbox" checked={bike125} onChange={(e) => setBike125(e.target.checked)} className="w-4 h-4 accent-black" />
               <span>125 CC Bike Cover</span>
             </label>
           </div>
         </div>
       </div>
 
-      {/* ✅ Cart Summary */}
       <div>
         <h2 className="text-xl font-semibold mb-2">Cart Summary</h2>
         {cart.length === 0 ? (

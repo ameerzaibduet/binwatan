@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { Product } from "@/types/product"
-import { Truck } from "lucide-react" // ✅ import proper icon
+import { Truck } from "lucide-react"
 
 type Props = {
   product: Product
@@ -39,31 +39,70 @@ export default function ProductCard({ product }: Props) {
   return (
     <div
       onClick={handleViewProduct}
-      className="cursor-pointer border rounded-lg overflow-hidden shadow hover:shadow-md transition"
+      className="
+        cursor-pointer
+        bg-white
+        rounded-3xl
+        overflow-hidden
+        transition-shadow duration-300
+        flex flex-col
+        group
+      "
     >
-      <Image
-        src={product.image}
-        alt={product.name}
-        width={400}
-        height={300}
-        className="w-full h-60 object-cover"
-      />
-      <div className="p-4">
-        <h2 className="text-lg font-semibold">{product.name}</h2>
-      
-        <p className="text-blue-600 font-bold">PKR {product.price}</p>
+      {/* Image without shadow */}
+      <div className="relative w-full h-80 overflow-hidden rounded-t-3xl">
+        <Image
+          src={product.image}
+          alt={product.name}
+          fill
+          className="
+            object-cover w-full h-full
+            transition-transform duration-500
+            group-hover:scale-105
+          "
+        />
+      </div>
 
-        {/* ✅ Free Delivery Badge with Icon */}
+      {/* Card Content */}
+      <div className="p-5 flex flex-col flex-1">
+        <h2 className="text-lg font-semibold text-gray-900 truncate">{product.name}</h2>
+        <p className="text-gray-900 font-bold text-lg mt-1">PKR {product.price}</p>
+
+        {/* Free Delivery Badge */}
         <div className="flex items-center text-green-600 text-sm font-medium mt-2">
           <Truck className="w-4 h-4 mr-1" />
           Free Delivery
         </div>
 
+        {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-3 mt-4">
-          <Button onClick={handleAddToCart} className="w-full sm:w-1/2 px-6 py-3 text-base font-medium">
+          <Button
+            onClick={handleAddToCart}
+            className="
+              w-full sm:w-1/2
+              px-6 py-3
+              text-base font-semibold
+              bg-black hover:bg-gray-800
+              text-white
+              rounded-xl
+              transition-all
+            "
+          >
             Add to Cart
           </Button>
-          <Button onClick={handleBuyNow} variant="outline" className="w-full sm:w-1/2 px-6 py-3 text-base font-medium">
+          <Button
+            onClick={handleBuyNow}
+            variant="outline"
+            className="
+              w-full sm:w-1/2
+              px-6 py-3
+              text-base font-semibold
+              border-black text-black
+              hover:bg-black/10
+              rounded-xl
+              transition-all
+            "
+          >
             Buy Now
           </Button>
         </div>
