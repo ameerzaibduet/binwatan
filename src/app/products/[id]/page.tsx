@@ -1,7 +1,6 @@
 "use client"
 
-import { use } from "react"
-import { useState, useEffect, useRef } from "react"
+import { use, useState, useEffect } from "react"
 import { notFound, useRouter } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
@@ -11,13 +10,22 @@ import { useCart } from "@/lib/use-cart"
 import { useCartUI } from "@/lib/use-cart-ui"
 import clsx from "clsx"
 import { motion, AnimatePresence } from "framer-motion"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import { ShieldCheck, Truck, ArrowRight, Minus } from "lucide-react"
 
 type Props = {
   params: Promise<{ id: string }>
 }
 
-// TikTok Pixel Helper Function
+// Map color names to Hex codes for the UI swatches
+const colorMap: Record<string, string> = {
+  "Black": "#1a1a1a",
+  "Red": "#b91c1c",
+  "Blue": "#1d4ed8",
+  "Grey": "#6b7280",
+  "Silver": "#cbd5e1",
+  "Brown": "#78350f",
+}
+
 const ttqTrack = (eventName: string, params: Record<string, any> = {}) => {
   if (typeof window !== "undefined" && (window as any).ttq) {
     ;(window as any).ttq.track(eventName, params)
@@ -30,18 +38,14 @@ export default function ProductDetailPage({ params }: Props) {
   const router = useRouter()
   const { addToCart } = useCart()
   const { openCart, closeCart } = useCartUI()
-  const scrollRef = useRef<HTMLDivElement>(null)
 
   const [selectedColor, setSelectedColor] = useState(
     product?.colors?.find((c) => c.default) || product?.colors?.[0]
   )
   const [selectedCC, setSelectedCC] = useState("70cc")
-  const [canScrollLeft, setCanScrollLeft] = useState(false)
-  const [canScrollRight, setCanScrollRight] = useState(false)
 
   if (!product) return notFound()
 
-  // Fire ViewContent on page load
   useEffect(() => {
     ttqTrack("ViewContent", {
       content_id: product.id,
@@ -54,8 +58,6 @@ export default function ProductDetailPage({ params }: Props) {
 
   const handleAddToCart = () => {
     addToCart({ ...product, quantity: 1, color: selectedColor?.name })
-
-    // TikTok AddToCart event
     ttqTrack("AddToCart", {
       content_id: product.id,
       content_type: "product",
@@ -63,197 +65,217 @@ export default function ProductDetailPage({ params }: Props) {
       price: product.price,
       currency: "PKR",
     })
-
     openCart()
   }
 
   const handleBuyNow = () => {
     addToCart({ ...product, quantity: 1, color: selectedColor?.name })
-
-    // TikTok InitiateCheckout event
     ttqTrack("InitiateCheckout", {
       content_id: product.id,
       content_type: "product",
       value: product.price,
       currency: "PKR",
     })
-
     closeCart()
     router.push("/checkout")
   }
 
-  const scrollGallery = (direction: "left" | "right") => {
-    const container = scrollRef.current
-    if (!container) return
-    const scrollAmount = 280
-    container.scrollBy({
-      left: direction === "left" ? -scrollAmount : scrollAmount,
-      behavior: "smooth",
-    })
-  }
-
-  const updateScrollButtons = () => {
-    const container = scrollRef.current
-    if (!container) return
-    setCanScrollLeft(container.scrollLeft > 10)
-    setCanScrollRight(
-      container.scrollLeft + container.clientWidth < container.scrollWidth - 10
-    )
-  }
-
-  useEffect(() => {
-    const container = scrollRef.current
-    if (!container) return
-    updateScrollButtons()
-    container.addEventListener("scroll", updateScrollButtons)
-    window.addEventListener("resize", updateScrollButtons)
-    return () => {
-      container.removeEventListener("scroll", updateScrollButtons)
-      window.removeEventListener("resize", updateScrollButtons)
-    }
-  }, [])
-
   return (
-    <div className="max-w-7xl mx-auto px-4 py-12">
-      {/* MAIN GRID */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-start">
-        {/* LEFT: Hero Image */}
-        <div className="space-y-6">
-          <div className="relative rounded-2xl overflow-hidden bg-white">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={selectedColor?.image}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.3 }}
-              >
-                <Image
-                  src={selectedColor?.image || "/placeholder.png"}
-                  alt={product.name}
-                  width={600}
-                  height={500}
-                  className="w-full h-auto object-contain rounded-2xl"
-                />
-              </motion.div>
-            </AnimatePresence>
+    <div className="bg-[#FCFCFC] min-h-screen antialiased text-slate-900">
+      <div className="max-w-7xl mx-auto px-6 py-12 md:py-20">
+        
+        {/* BREADCRUMB - Classic touch */}
+        <nav className="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-12">
+          <Link href="/" className="hover:text-slate-900 transition">Home</Link>
+          <span>/</span>
+          <span className="text-slate-900 uppercase">{product.name}</span>
+        </nav>
 
-            {/* Thumbnail carousel */}
-            <div className="flex gap-4 overflow-x-auto mt-4 pb-2 scrollbar-hide">
+        {/* MAIN PRODUCT GRID */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-24 items-start">
+          
+          {/* LEFT: Image Gallery */}
+          <div className="lg:col-span-7">
+            <div className="relative aspect-[4/5] bg-white border border-slate-100 rounded-sm overflow-hidden group">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={selectedColor?.image}
+                  initial={{ opacity: 0, scale: 1.02 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.7, ease: [0.19, 1, 0.22, 1] }}
+                  className="w-full h-full relative"
+                >
+                  <Image
+                    src={selectedColor?.image || "/placeholder.png"}
+                    alt={product.name}
+                    fill
+                    priority
+                    className="object-contain p-6 md:p-12"
+                  />
+                </motion.div>
+              </AnimatePresence>
+            </div>
+
+            {/* Thumbnails */}
+            <div className="flex gap-4 mt-6 overflow-x-auto pb-2 scrollbar-hide">
               {product.colors.map((color) => (
                 <button
                   key={color.name}
                   onClick={() => setSelectedColor(color)}
-                  className={`flex-shrink-0 rounded-xl border-2 ${
-                    selectedColor?.name === color.name
-                      ? "border-blue-600"
-                      : "border-gray-200"
-                  }`}
-                >
-                  <Image
-                    src={color.image}
-                    alt={color.name}
-                    width={80}
-                    height={80}
-                    className="object-cover w-20 h-20 rounded-xl"
-                  />
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* RIGHT: Product Info */}
-        <div className="p-6 rounded-3xl shadow-xl border bg-transparent">
-          <h3 className="text-3xl font-bold text-gray-900 mb-3">{product.name}</h3>
-          <p className="text-2xl font-semibold text-blue-600 mb-6">PKR {product.price}</p>
-
-          {/* Description */}
-          <ul className="mb-8 text-sm text-gray-700 grid grid-cols-2 gap-y-3">
-            {product.description.split("\n").map((line, i) => (
-              <li key={i} className="flex items-center gap-2">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="w-5 h-5 text-blue-600"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                <span>{line.trim()}</span>
-              </li>
-            ))}
-          </ul>
-
-          {/* Bike Type Selector */}
-          <div className="mb-6">
-            <p className="font-medium mb-2">Select Bike Type:</p>
-            <div className="flex gap-3 flex-wrap">
-              {["70cc", "125cc"].map((cc) => (
-                <button
-                  key={cc}
-                  onClick={() => setSelectedCC(cc)}
                   className={clsx(
-                    "px-5 py-2 rounded-lg border text-sm font-medium transition-all duration-200",
-                    selectedCC === cc
-                      ? "bg-blue-600 text-white border-blue-600 shadow-md"
-                      : "bg-white text-gray-900 border-gray-300 hover:border-blue-400"
+                    "relative flex-shrink-0 w-20 h-20 border transition-all duration-300 rounded-sm",
+                    selectedColor?.name === color.name ? "border-slate-900" : "border-slate-100"
                   )}
                 >
-                  {cc}
+                  <Image src={color.image} alt={color.name} fill className="object-cover p-1" />
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Selected Info */}
-          <div className="mb-6 text-sm text-gray-700">
-            <p>Color: <span className="font-semibold text-blue-600">{selectedColor?.name}</span></p>
-            <p>Bike Type: <span className="font-semibold text-blue-600">{selectedCC}</span></p>
-          </div>
+          {/* RIGHT: Product Information */}
+          <div className="lg:col-span-5 flex flex-col pt-2">
+            <header className="mb-10">
+              <div className="flex items-center gap-2 mb-4">
+                <Minus className="w-6 text-blue-600" />
+                <span className="text-[10px] uppercase tracking-[0.3em] text-blue-600 font-bold">
+                  Artisan Quality
+                </span>
+              </div>
+              <h1 className="text-4xl md:text-5xl font-serif leading-[1.1] mb-6">
+                {product.name}
+              </h1>
+              <p className="text-2xl font-light tracking-tight text-slate-500">
+                PKR {product.price.toLocaleString()}
+              </p>
+            </header>
 
-          {/* Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 mt-8">
-            <Button
-              onClick={handleAddToCart}
-              className="w-full sm:w-1/2 py-3 text-base font-medium bg-gray-900 text-white hover:bg-gray-800 rounded-lg shadow-lg"
-            >
-              Add to Cart
-            </Button>
-
-            <Button
-              onClick={handleBuyNow}
-              className="w-full sm:w-1/2 py-3 text-base font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-lg"
-            >
-              Buy Now
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* Related Products */}
-      <div className="mt-16">
-        <h3 className="text-2xl font-bold mb-6 text-gray-900">All Products</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-4 gap-6">
-          {Products.map((item) => (
-            <Link href={`/products/${item.id}`} key={item.id}>
-              <div className="cursor-pointer overflow-hidden rounded-3xl shadow-md hover:shadow-xl transition-all">
-                <Image
-                  src={item.colors?.[0]?.image}
-                  alt={item.name}
-                  width={300}
-                  height={250}
-                  className="w-full h-auto object-cover"
-                />
-                <div className="p-3 bg-transparent">
-                  <h4 className="font-semibold text-sm mb-1 text-gray-900">{item.name}</h4>
-                  <p className="text-blue-600 text-sm font-semibold">PKR {item.price}</p>
+            {/* Selection Area */}
+            <div className="space-y-10">
+              {/* Color Swatches */}
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.2em] font-bold mb-4 text-slate-400">
+                  Select Finish: <span className="text-slate-900 ml-2">{selectedColor?.name}</span>
+                </p>
+                <div className="flex gap-4">
+                  {product.colors.map((color) => (
+                    <button
+                      key={color.name}
+                      onClick={() => setSelectedColor(color)}
+                      className={clsx(
+                        "w-7 h-7 rounded-full border transition-all duration-300 ring-offset-2",
+                        selectedColor?.name === color.name ? "ring-2 ring-slate-900" : "ring-0"
+                      )}
+                      style={{ backgroundColor: colorMap[color.name] || "#000" }}
+                      title={color.name}
+                    />
+                  ))}
                 </div>
               </div>
-            </Link>
-          ))}
+
+              {/* Bike Type */}
+              <div>
+                <div className="flex justify-between items-center mb-4">
+                  <p className="text-[11px] uppercase tracking-[0.2em] font-bold text-slate-400">Engine Capacity</p>
+                  <button className="text-[10px] uppercase tracking-widest text-slate-400 underline underline-offset-4 hover:text-slate-900 transition">
+                    Size Guide
+                  </button>
+                </div>
+                <div className="flex gap-3">
+                  {["70cc", "125cc"].map((cc) => (
+                    <button
+                      key={cc}
+                      onClick={() => setSelectedCC(cc)}
+                      className={clsx(
+                        "flex-1 py-4 text-[11px] font-bold uppercase tracking-[0.2em] border transition-all duration-500",
+                        selectedCC === cc 
+                          ? "bg-slate-900 text-white border-slate-900 shadow-xl" 
+                          : "bg-transparent text-slate-400 border-slate-200 hover:border-slate-900 hover:text-slate-900"
+                      )}
+                    >
+                      {cc}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-col gap-3 pt-4">
+                <Button
+                  onClick={handleBuyNow}
+                  className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-none uppercase text-[11px] font-bold tracking-[0.2em] transition-all"
+                >
+                  Buy Now — PKR {product.price.toLocaleString()}
+                </Button>
+                <Button
+                  onClick={handleAddToCart}
+                  variant="outline"
+                  className="w-full h-14 border-slate-900 text-slate-900 rounded-none uppercase text-[11px] font-bold tracking-[0.2em] hover:bg-slate-900 hover:text-white transition-all"
+                >
+                  Add to Shopping Bag
+                </Button>
+              </div>
+
+              {/* Features List */}
+              <div className="pt-10 border-t border-slate-100 space-y-4">
+                 {product.description.split("\n").map((line, i) => (
+                  <div key={i} className="flex items-start gap-4 text-slate-500">
+                    <div className="w-1 h-1 rounded-full bg-blue-600 mt-2 flex-shrink-0" />
+                    <p className="text-xs leading-relaxed uppercase tracking-wide">{line.trim()}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Trust Section */}
+              <div className="grid grid-cols-2 gap-8 pt-10 border-t border-slate-100">
+                <div className="flex flex-col gap-2">
+                  <Truck className="w-5 h-5 stroke-[1px] text-slate-400" />
+                  <h4 className="text-[10px] font-bold uppercase tracking-widest">Global Delivery</h4>
+                  <p className="text-[10px] text-slate-400 leading-relaxed">Fast & tracked shipping across Pakistan.</p>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <ShieldCheck className="w-5 h-5 stroke-[1px] text-slate-400" />
+                  <h4 className="text-[10px] font-bold uppercase tracking-widest">Quality Shield</h4>
+                  <p className="text-[10px] text-slate-400 leading-relaxed">Made from premium weather-resistant fabrics.</p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
+
+        {/* RELATED PRODUCTS */}
+        <section className="mt-40">
+          <div className="flex flex-col md:flex-row justify-between items-end mb-16 gap-4">
+            <div>
+              <span className="text-[10px] uppercase tracking-[0.3em] text-slate-400 font-bold mb-2 block">Recommendation</span>
+              <h3 className="text-3xl font-serif">Explore Collections</h3>
+            </div>
+            <Link href="/shop" className="text-[10px] uppercase tracking-widest font-bold border-b border-slate-900 pb-1 flex items-center gap-2 group hover:text-blue-600 hover:border-blue-600 transition-all">
+              View All <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
+            </Link>
+          </div>
+          
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12">
+            {Products.filter(p => p.id !== product.id).slice(0, 4).map((item) => (
+              <Link href={`/products/${item.id}`} key={item.id} className="group">
+                <div className="relative aspect-[3/4] overflow-hidden bg-white border border-slate-100 mb-6 transition-all duration-500 group-hover:shadow-2xl group-hover:shadow-slate-200/50">
+                  <Image
+                    src={item.colors?.[0]?.image}
+                    alt={item.name}
+                    fill
+                    className="object-contain p-6 transition-transform duration-700 group-hover:scale-110"
+                  />
+                </div>
+                <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-900 mb-2 group-hover:text-blue-600 transition-colors">
+                  {item.name}
+                </h4>
+                <p className="text-sm font-light text-slate-500">PKR {item.price.toLocaleString()}</p>
+              </Link>
+            ))}
+          </div>
+        </section>
+
       </div>
     </div>
   )
