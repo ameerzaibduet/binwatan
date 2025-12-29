@@ -190,7 +190,7 @@ export default function ProductDetailPage({ params }: Props) {
           <div className="mb-6">
             <p className="font-medium mb-2">Select Bike Type:</p>
             <div className="flex gap-3 flex-wrap">
-              {["70cc", "125cc"].map((cc) => (
+              {["70cc", "110cc", "125cc", "150cc"].map((cc) => (
                 <button
                   key={cc}
                   onClick={() => setSelectedCC(cc)}

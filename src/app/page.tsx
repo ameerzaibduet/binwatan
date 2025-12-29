@@ -33,23 +33,10 @@ export default function HomePage() {
       {/* Hero Section */}
       <Hero />
 
-      {/* 1. Trust Header - Refined Spacing & Typography */}
-      <div className="border-b border-slate-100 bg-white">
-        <div className="max-w-7xl mx-auto px-6 py-5 flex flex-wrap justify-center gap-12 md:justify-between items-center">
-          {[
-            { icon: <Truck className="w-4 h-4" />, text: "Complimentary Shipping" },
-            { icon: <Shield className="w-4 h-4" />, text: "Two-Year Warranty" },
-            { icon: <Headphones className="w-4 h-4" />, text: "Expert Consultation" },
-          ].map((item, i) => (
-            <div key={i} className="flex items-center gap-3 text-[10px] uppercase tracking-[0.2em] font-bold text-slate-400">
-              {item.icon} {item.text}
-            </div>
-          ))}
-        </div>
-      </div>
+     
 
       {/* 2. Featured Categories - Increased Padding */}
-      <section className="max-w-7xl mx-auto  pb-20 px-6">
+      <section className="max-w-7xl mx-auto  pb-10 mt-15">
         <div className="flex flex-col items-center text-center mb-16">
           <span className="text-blue-600 text-xs font-bold uppercase tracking-[0.3em] mb-4">Discovery</span>
           <h2 className="text-4xl md:text-5xl font-serif text-slate-900 tracking-tight">Curated Materials</h2>
