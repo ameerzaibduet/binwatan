@@ -38,7 +38,11 @@ export default function HomePage() {
       {/* 2. Featured Categories - Increased Padding */}
       <section className="max-w-7xl mx-auto  pb-10 mt-15">
         <div className="flex flex-col items-center text-center mb-16">
-          <span className="text-blue-600 text-xs font-bold uppercase tracking-[0.3em] mb-4">Discovery</span>
+         <div className="flex items-center gap-2 mb-4">
+                <Minus className="text-orange-400 w-8" />
+                <span className="text-orange-400 text-xs font-bold uppercase tracking-[0.3em]">DISCOVER MORE</span>
+                <Minus className="text-orange-400 w-8" />
+              </div>
           <h2 className="text-4xl md:text-5xl font-serif text-slate-900 tracking-tight">Curated Materials</h2>
         </div>
         
@@ -65,19 +69,18 @@ export default function HomePage() {
       </section>
 
       {/* 3. Top Products - Systematic Grid Spacing */}
-      <section className="bg-white py-32 border-y border-slate-100">
+      <section className="bg-white py-20 border-y border-slate-100">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="flex flex-col md:flex-row md:items-end justify-between mb-20 gap-6">
-            <div className="max-w-xl">
+          <div className="flex flex-col items-center text-center mb-16">
+            <div className="flex flex-col items-center text-center mb-16">
               <div className="flex items-center gap-2 mb-4">
-                <Minus className="text-blue-600 w-8" />
-                <span className="text-blue-600 text-xs font-bold uppercase tracking-[0.3em]">Our Essentials</span>
+                <Minus className="text-orange-400 w-8" />
+                <span className="text-orange-400 text-xs font-bold uppercase tracking-[0.3em]">Our Essentials</span>
+                <Minus className="text-orange-400 w-8" />
               </div>
               <h2 className="text-4xl md:text-5xl font-serif tracking-tight text-slate-900">Most Desired Pieces</h2>
             </div>
-            <Link href="/shop" className="text-sm font-bold uppercase tracking-widest border-b-2 border-slate-900 pb-1 hover:text-blue-600 hover:border-blue-600 transition-all">
-              View All Products
-            </Link>
+      
           </div>
           
           <motion.div
@@ -109,15 +112,18 @@ export default function HomePage() {
             <p className="text-white/70 text-lg mb-10 max-w-md leading-relaxed">
               Experience the fusion of artisanal craftsmanship and modern durability.
             </p>
-            <button className="inline-block bg-white text-slate-900 px-10 py-5 text-xs font-bold uppercase tracking-[0.2em] hover:bg-blue-600 hover:text-white transition-all duration-300">
+           <Link href="/category/parachute">
+           
+           <button className="inline-block bg-orange-400 text-white px-10 py-5 text-xs font-bold uppercase tracking-[0.2em] hover:bg-white hover:text-black transition-all duration-300">
               Explore New Arrivals
             </button>
+           </Link> 
           </div>
         </div>
       </section>
 
       {/* 5. Benefits Section - Clean & Balanced */}
-      <section className="max-w-5xl mx-auto py-32 px-6">
+      <section className="max-w-5xl mx-auto pt-10 pb-20 px-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-20">
           {[
             { title: "Delivery", desc: "Reliable nationwide logistics ensuring your order arrives in pristine condition." },
@@ -125,7 +131,7 @@ export default function HomePage() {
             { title: "Support", desc: "A dedicated concierge service available 24/7 for all your tailoring needs." },
           ].map((item, idx) => (
             <div key={idx} className="flex flex-col items-center text-center">
-              <span className="text-slate-300 text-4xl font-serif mb-6">0{idx + 1}</span>
+              <span className="text-orange-400 text-4xl font-serif mb-6">0{idx + 1}</span>
               <h3 className="text-xs font-bold uppercase tracking-[0.3em] mb-4 text-slate-900">{item.title}</h3>
               <p className="text-slate-500 text-sm leading-relaxed font-light">{item.desc}</p>
             </div>

@@ -166,7 +166,7 @@ export default function ProductDetailPage({ params }: Props) {
         {/* RIGHT: Product Info */}
         <div className="p-6 rounded-3xl shadow-xl border bg-transparent">
           <h3 className="text-3xl font-bold text-gray-900 mb-3">{product.name}</h3>
-          <p className="text-2xl font-semibold text-blue-600 mb-6">PKR {product.price}</p>
+          <p className="text-2xl font-semibold text-orange-400 mb-6">PKR {product.price}</p>
 
           {/* Description */}
           <ul className="mb-8 text-sm text-gray-700 grid grid-cols-2 gap-y-3">
@@ -197,7 +197,7 @@ export default function ProductDetailPage({ params }: Props) {
                   className={clsx(
                     "px-5 py-2 rounded-lg border text-sm font-medium transition-all duration-200",
                     selectedCC === cc
-                      ? "bg-blue-600 text-white border-blue-600 shadow-md"
+                      ? "bg-orange-400 text-white border-Black-600 shadow-md"
                       : "bg-white text-gray-900 border-gray-300 hover:border-blue-400"
                   )}
                 >
@@ -224,7 +224,7 @@ export default function ProductDetailPage({ params }: Props) {
 
             <Button
               onClick={handleBuyNow}
-              className="w-full sm:w-1/2 py-3 text-base font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-lg"
+              className="w-full sm:w-1/2 py-3 text-base font-medium bg-orange-400 hover:bg-orange-800 text-white rounded-lg shadow-lg"
             >
               Buy Now
             </Button>
@@ -248,7 +248,7 @@ export default function ProductDetailPage({ params }: Props) {
                 />
                 <div className="p-3 bg-transparent">
                   <h4 className="font-semibold text-sm mb-1 text-gray-900">{item.name}</h4>
-                  <p className="text-blue-600 text-sm font-semibold">PKR {item.price}</p>
+                  <p className="text-orange-400 text-sm font-semibold">PKR {item.price}</p>
                 </div>
               </div>
             </Link>

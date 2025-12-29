@@ -69,7 +69,7 @@ export default function ProductCard({ product }: Props) {
         <p className="text-gray-900 font-bold text-lg mt-1">PKR {product.price}</p>
 
         {/* Free Delivery Badge */}
-        <div className="flex items-center text-green-600 text-sm font-medium mt-2">
+        <div className="flex items-center text-orange-400 text-sm font-medium mt-2">
           <Truck className="w-4 h-4 mr-1" />
           Free Delivery
         </div>
@@ -84,7 +84,7 @@ export default function ProductCard({ product }: Props) {
               text-base font-semibold
               bg-black hover:bg-gray-800
               text-white
-              rounded-xl
+              
               transition-all
             "
           >
@@ -99,7 +99,7 @@ export default function ProductCard({ product }: Props) {
               text-base font-semibold
               border-black text-black
               hover:bg-black/10
-              rounded-xl
+              
               transition-all
             "
           >

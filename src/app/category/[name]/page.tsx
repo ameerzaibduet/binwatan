@@ -30,7 +30,7 @@ export default function CategoryPage() {
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[60%] bg-purple-600/20 blur-[120px] rounded-full" />
         
         <img
-          src={filteredProducts[0]?.image || "/placeholder.jpg"}
+          src={filteredProducts[0]?.image || "/newarrival.png"}
           alt="Hero"
           className="absolute inset-0 w-full h-full object-cover opacity-50 grayscale-[0.5]"
         />
@@ -42,11 +42,11 @@ export default function CategoryPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, ease: "easeOut" }}
           >
-            <span className="inline-block px-4 py-1.5 mb-6 text-xs font-bold tracking-[0.2em] text-orange-400 uppercase bg-blue-400/10 border border-blue-400/20 rounded-full backdrop-blur-md">
+            <span className="inline-block px-4 py-1.5 mb-6 text-xs font-bold tracking-[0.2em] text-orange-400 uppercase bg-blue-400/10 border border-orange-400/20 rounded-full backdrop-blur-md">
               Premium Collection
             </span>
             <h1 className="text-6xl md:text-8xl font-black text-white tracking-tighter mb-6 uppercase italic">
-              {categoryName}<span className="text-orange-600">.</span>
+              {categoryName}<span className="text-orange-400">.</span>
             </h1>
             <p className="max-w-xl mx-auto text-gray-400 text-lg md:text-xl font-light leading-relaxed">
               Engineering excellence meets modern aesthetics. Browse our signature {categoryName} lineup.
@@ -55,33 +55,7 @@ export default function CategoryPage() {
         </div>
       </section>
 
-      {/* 🛠️ BENTO INFO SECTION */}
-      <div className="max-w-7xl mx-auto px-6 -mt-16 relative z-20">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white/80 backdrop-blur-xl p-8 rounded-[2rem] border border-white shadow-xl shadow-black/5 flex items-center gap-5">
-            <div className="p-4 bg-blue-50 text-blue-600 rounded-2xl"><Truck size={24}/></div>
-            <div>
-              <h4 className="font-bold">Fast Delivery</h4>
-              <p className="text-sm text-gray-500">Global shipping in 3-5 days</p>
-            </div>
-          </div>
-          <div className="bg-white/80 backdrop-blur-xl p-8 rounded-[2rem] border border-white shadow-xl shadow-black/5 flex items-center gap-5">
-            <div className="p-4 bg-purple-50 text-purple-600 rounded-2xl"><ShieldCheck size={24}/></div>
-            <div>
-              <h4 className="font-bold">2-Year Warranty</h4>
-              <p className="text-sm text-gray-500">Guaranteed quality control</p>
-            </div>
-          </div>
-          <div className="bg-white/80 backdrop-blur-xl p-8 rounded-[2rem] border border-white shadow-xl shadow-black/5 flex items-center gap-5">
-            <div className="p-4 bg-orange-50 text-orange-600 rounded-2xl"><Sparkles size={24}/></div>
-            <div>
-              <h4 className="font-bold">Eco Friendly</h4>
-              <p className="text-sm text-gray-500">100% Sustainable packaging</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
+      
       {/* 📦 PRODUCTS FEED */}
       <section className="max-w-7xl mx-auto px-6 mt-20">
     
@@ -113,10 +87,37 @@ export default function CategoryPage() {
         </AnimatePresence>
       </section>
 
+          {/* 🛠️ BENTO INFO SECTION */}
+      <div className="max-w-7xl mx-auto px-6 mt-16 relative z-20">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white backdrop-blur-xl p-8 rounded-[1rem] border border-orange-400 shadow-xl shadow-black/10 flex items-center gap-5">
+            <div className="p-4 bg-orange-400 text-white rounded-2xl"><Truck size={24}/></div>
+            <div>
+              <h4 className="font-bold ">Fast Delivery</h4>
+              <p className="text-sm text-gray-200">Global shipping in 3-5 days</p>
+            </div>
+          </div>
+          <div className="bg-white backdrop-blur-xl p-8 rounded-[1rem] border border-orange-400 shadow-xl shadow-black/10 flex items-center gap-5">
+            <div className="p-4 bg-orange-400 text-white rounded-2xl"><ShieldCheck size={24}/></div>
+            <div>
+              <h4 className="font-bold ">2-Year Warranty</h4>
+              <p className="text-sm text-gray-200">Guaranteed quality control</p>
+            </div>
+          </div>
+          <div className="bg-white backdrop-blur-xl p-8 rounded-[1rem] border border-orange-400 shadow-xl shadow-black/10 flex items-center gap-5">
+            <div className="p-4 bg-orange-400 text-white rounded-2xl"><Sparkles size={24}/></div>
+            <div>
+              <h4 className="font-bold ">Eco Friendly</h4>
+              <p className="text-sm text-gray-200">100% Sustainable packaging</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* 📧 NEWSLETTER / CTA SECTION */}
       <section className="max-w-7xl mx-auto px-6 mt-32">
         <div className="relative overflow-hidden bg-slate-900 rounded-[3rem] p-12 md:p-20 flex flex-col items-center text-center">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-blue-600/20 blur-[100px]" />
+          <div className="absolute top-0 right-0 w-96 h-96 bg-orange-400/20 blur-[100px]" />
           <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">Join the Inner Circle</h2>
           <p className="text-gray-400 max-w-lg mb-10">Get early access to limited edition drops and member-only pricing.</p>
           
@@ -124,9 +125,9 @@ export default function CategoryPage() {
             <input 
               type="email" 
               placeholder="Enter your email" 
-              className="flex-1 h-14 px-6 rounded-2xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-blue-500 transition"
+              className="flex-1 h-14 px-6 rounded-2xl bg-orange-400/5 border border-white/10 text-white focus:outline-none focus:bg-white focus:border-blue-500 focus:text-black transition"
             />
-            <button className="h-14 px-8 rounded-2xl bg-blue-600 text-white font-bold hover:bg-blue-700 transition flex items-center justify-center gap-2">
+            <button className="h-14 px-8 rounded-2xl bg-orange-400 text-white font-bold hover:bg-white hover:text-orange-400 transition flex items-center justify-center gap-2">
               Subscribe <ArrowRight size={18}/>
             </button>
           </div>
