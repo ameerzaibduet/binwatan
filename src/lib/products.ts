@@ -17,7 +17,7 @@ export const Products = [
       { name: "silver", image: "/images/silver.jpeg"},
       { name: "darkBrown", image: "/images/darkbrown.jpeg"},
       { name: "gray", image: "/images/gray.jpeg"},
-      { name: "red", image: "/images/4pocketred.png"}
+      { name: "red", image: "/images/4PRed.png"}
     
     ]
   },
@@ -39,7 +39,7 @@ export const Products = [
       { name: "silver", image: "/images/silver.jpeg"},
       { name: "darkBrown", image: "/images/darkbrown.jpeg"},
       { name: "gray", image: "/images/gray.jpeg"},
-      { name: "red", image: "/images/4pocketred.png"}
+      { name: "red", image: "/images/4PRed.png"}
     
     ]
   },
@@ -61,7 +61,7 @@ export const Products = [
       { name: "silver", image: "/images/silver.jpeg"},
       { name: "darkBrown", image: "/images/darkbrown.jpeg"},
       { name: "gray", image: "/images/gray.jpeg"},
-      { name: "red", image: "/images/4pocketred.png"}
+      { name: "red", image: "/images/4PRed.png"}
     
     ]
   },
@@ -84,14 +84,14 @@ export const Products = [
       { name: "blue", image: "/images/4pocketBlue.png"},
       { name: "silver", image: "/images/silver.jpeg"},
       { name: "darkBrown", image: "/images/darkbrown.jpeg"},
-      { name: "red", image: "/images/4pocketred.png"}
+      { name: "red", image: "/images/4PRed.png"}
     ]
   },
    {
     id: "6",
     name: "Perashot Bike Cover",
     price: 1200 ,
-    image: "/images/4pocketred.png",
+    image: "/images/4PRed.png",
     category: "Parachute",
     description: ` Free delivery
  Open parcel allowed
@@ -125,7 +125,7 @@ export const Products = [
       { name: "black", image: "/images/4pocketBlack.png" },
       { name: "green", image: "/images/4pocketGreen.png" },
       { name: "blue", image: "/images/4pocketBlue.png"},
-      { name: "red", image: "/images/4pocketred.png"},
+      { name: "red", image: "/images/4PRed.png"},
       { name: "darkBrown", image: "/images/darkbrown.jpeg"},
       { name: "gray", image: "/images/gray.jpeg"}
 
@@ -147,7 +147,7 @@ export const Products = [
       { name: "black", image: "/images/4pocketBlack.png" },
       { name: "green", image: "/images/4pocketGreen.png" },
       { name: "blue", image: "/images/4pocketBlue.png"},
-      { name: "red", image: "/images/4pocketred.png"},
+      { name: "red", image: "/images/4PRed.png"},
       { name: "silver", image: "/images/silver.jpeg"},
       { name: "gray", image: "/images/gray.jpeg"}
 
