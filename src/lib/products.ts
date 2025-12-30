@@ -14,8 +14,8 @@ export const Products = [
       { name: "black", image: "/images/4pocketBlack.png", default: true },
       { name: "green", image: "/images/4pocketGreen.png" },
       { name: "blue", image: "/images/4pocketBlue.png" },
-      { name: "silver", image: "/images/4psilver.jpeg"},
-      { name: "darkBrown", image: "/images/4Pdarkbrown.jpeg"},
+      { name: "silver", image: "/images/4ppsilver.jpeg"},
+      { name: "darkBrown", image: "/images/4Ppdarkbrown.jpeg"},
       { name: "gray", image: "/images/gray.jpeg"},
       { name: "red", image: "/images/4PRed.png"}
     
@@ -36,8 +36,8 @@ export const Products = [
       { name: "green", image: "/images/4pocketGreen.png", default: true },
       { name: "black", image: "/images/4pocketBlack.png" },
       { name: "blue", image: "/images/4pocketBlue.png" },
-      { name: "silver", image: "/images/4psilver.jpeg"},
-      { name: "darkBrown", image: "/images/4Pdarkbrown.jpeg"},
+      { name: "silver", image: "/images/4ppsilver.jpeg"},
+      { name: "darkBrown", image: "/images/4Ppdarkbrown.jpeg"},
       { name: "gray", image: "/images/gray.jpeg"},
       { name: "red", image: "/images/4PRed.png"}
     
@@ -58,8 +58,8 @@ export const Products = [
       { name: "blue", image: "/images/4pocketBlue.png", default: true },
       { name: "black", image: "/images/4pocketBlack.png" },
       { name: "green", image: "/images/4pocketGreen.png" },
-      { name: "silver", image: "/images/4psilver.jpeg"},
-      { name: "darkBrown", image: "/images/4Pdarkbrown.jpeg"},
+      { name: "silver", image: "/images/4ppsilver.jpeg"},
+      { name: "darkBrown", image: "/images/4Ppdarkbrown.jpeg"},
       { name: "gray", image: "/images/gray.jpeg"},
       { name: "red", image: "/images/4PRed.png"}
     
@@ -82,8 +82,8 @@ export const Products = [
       { name: "black", image: "/images/4pocketBlack.png" },
       { name: "green", image: "/images/4pocketGreen.png" },
       { name: "blue", image: "/images/4pocketBlue.png"},
-      { name: "silver", image: "/images/4psilver.jpeg"},
-      { name: "darkBrown", image: "/images/4Pdarkbrown.jpeg"},
+      { name: "silver", image: "/images/4ppsilver.jpeg"},
+      { name: "darkBrown", image: "/images/4Ppdarkbrown.jpeg"},
       { name: "red", image: "/images/4PRed.png"}
     ]
   },
@@ -103,8 +103,8 @@ export const Products = [
       { name: "black", image: "/images/4pocketBlack.png" },
       { name: "green", image: "/images/4pocketGreen.png" },
       { name: "blue", image: "/images/4pocketBlue.png"},
-      { name: "silver", image: "/images/4psilver.jpeg"},
-      { name: "darkBrown", image: "/images/4Pdarkbrown.jpeg"},
+      { name: "silver", image: "/images/4ppsilver.jpeg"},
+      { name: "darkBrown", image: "/images/4Ppdarkbrown.jpeg"},
       { name: "gray", image: "/images/gray.jpeg"}
 
     ]
@@ -113,7 +113,7 @@ export const Products = [
     id: "7",
     name: "Perashot Bike Cover",
     price: 1200 ,
-    image: "/images/4psilver.jpeg",
+    image: "/images/4ppsilver.jpeg",
     category: "Parachute",
     description: ` Free delivery
  Open parcel allowed
@@ -121,12 +121,12 @@ export const Products = [
  1-year warranty`,
     quantity: 1,
     colors: [
-      { name: "silver", image: "/images/4psilver.jpeg", default: true },
+      { name: "silver", image: "/images/4ppsilver.jpeg", default: true },
       { name: "black", image: "/images/4pocketBlack.png" },
       { name: "green", image: "/images/4pocketGreen.png" },
       { name: "blue", image: "/images/4pocketBlue.png"},
       { name: "red", image: "/images/4PRed.png"},
-      { name: "darkBrown", image: "/images/4Pdarkbrown.jpeg"},
+      { name: "darkBrown", image: "/images/4Ppdarkbrown.jpeg"},
       { name: "gray", image: "/images/gray.jpeg"}
 
     ]
@@ -135,7 +135,7 @@ export const Products = [
     id: "8",
     name: "Perashot Bike Cover",
     price: 1200 ,
-    image: "/images/4Pdarkbrown.jpeg",
+    image: "/images/4Ppdarkbrown.jpeg",
     category: "Parachute",
     description: ` Free delivery
  Open parcel allowed
@@ -143,12 +143,12 @@ export const Products = [
  1-year warranty`,
     quantity: 1,
     colors: [
-      { name: "darkbrown", image: "/images/4Pdarkbrown.jpeg", default: true },
+      { name: "darkbrown", image: "/images/4pPdarkbrown.jpeg", default: true },
       { name: "black", image: "/images/4pocketBlack.png" },
       { name: "green", image: "/images/4pocketGreen.png" },
       { name: "blue", image: "/images/4pocketBlue.png"},
       { name: "red", image: "/images/4PRed.png"},
-      { name: "silver", image: "/images/4psilver.jpeg"},
+      { name: "silver", image: "/images/4ppsilver.jpeg"},
       { name: "gray", image: "/images/gray.jpeg"}
 
     ]
@@ -164,7 +164,7 @@ export const Products = [
     id: "9",
     name: "Rexine Bike Cover",
     price: 1800 ,
-    image: "/images/4pregblack.png",
+    image: "/images/4ppregblack.png",
     category: "Rexine",
     description: ` Free delivery
  Open parcel allowed
@@ -172,17 +172,17 @@ export const Products = [
  1-year warranty`,
     quantity: 1,
     colors: [
-      { name: "black", image: "/images/4pregblack.png", default: true },
-      { name: "mustard", image: "/images/4pregMustard.png" },
-      { name: "gray", image: "/images/4pregGray.png" },
-      { name: "blue", image: "/images/4pregBlue.png" }
+      { name: "black", image: "/images/4ppregblack.png", default: true },
+      { name: "mustard", image: "/images/4ppregMustard.png" },
+      { name: "gray", image: "/images/4ppregGray.png" },
+      { name: "blue", image: "/images/4ppregBlue.png" }
     ]
   },
 {
     id: "10",
     name: "Rexine Bike Cover",
     price: 1800 ,
-    image: "/images/4pregMustard.png",
+    image: "/images/4ppregMustard.png",
     category: "Rexine",
     description: ` Free delivery
  Open parcel allowed
@@ -190,17 +190,17 @@ export const Products = [
  1-year warranty`,
     quantity: 1,
     colors: [
-      { name: "mustard", image: "/images/4pregMustard.png", default: true },
-      { name: "black", image: "/images/4pregblack.png" },
-      { name: "gray", image: "/images/4pregGray.png" },
-      { name: "blue", image: "/images/4pregBlue.png" }
+      { name: "mustard", image: "/images/4ppregMustard.png", default: true },
+      { name: "black", image: "/images/4ppregblack.png" },
+      { name: "gray", image: "/images/4ppregGray.png" },
+      { name: "blue", image: "/images/4ppregBlue.png" }
     ]
   },
   {
     id: "11",
     name: "Rexine Bike Cover",
     price: 1800 ,
-    image: "/images/4pregGray.png",
+    image: "/images/4ppregGray.png",
     category: "Rexine",
     description: ` Free delivery
  Open parcel allowed
@@ -208,17 +208,17 @@ export const Products = [
  1-year warranty`,
     quantity: 1,
     colors: [
-      { name: "gray", image: "/images/4regGray.png", default: true },
-      { name: "black", image: "/images/4pregblack.png" },
-      { name: "mustard", image: "/images/4pregMustard.png" },
-      { name: "blue", image: "/images/4pregBlue.png" }
+      { name: "gray", image: "/images/4ppregGray.png", default: true },
+      { name: "black", image: "/images/4ppregblack.png" },
+      { name: "mustard", image: "/images/4ppregMustard.png" },
+      { name: "blue", image: "/images/4ppregBlue.png" }
     ]
   },
    {
     id: "12",
     name: "Rexine Bike Cover",
     price: 1800 ,
-    image: "/images/4pregBlue.png",
+    image: "/images/4ppregBlue.png",
     category: "Rexine",
     description: ` Free delivery
  Open parcel allowed
@@ -226,10 +226,10 @@ export const Products = [
  1-year warranty`,
     quantity: 1,
     colors: [
-      { name: "blue", image: "/images/4pregBlue.png", default: true },
-      { name: "black", image: "/images/4pregblack.png" },
-      { name: "mustard", image: "/images/4pregMustard.png" },
-      { name: "gray", image: "/images/4pregGray.png" }
+      { name: "blue", image: "/images/4ppregBlue.png", default: true },
+      { name: "black", image: "/images/4ppregblack.png" },
+      { name: "mustard", image: "/images/4ppregMustard.png" },
+      { name: "gray", image: "/images/4ppregGray.png" }
     ]
   },
 
