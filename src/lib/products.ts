@@ -14,7 +14,7 @@ export const Products = [
       { name: "black", image: "/images/4pocketBlack.png", default: true },
       { name: "green", image: "/images/4pocketGreen.png" },
       { name: "blue", image: "/images/4pocketBlue.png" },
-      { name: "silver", image: "/images/4ppsilver.jpeg"},
+      { name: "silver", image: "/images/4psilver.jpeg"},
       { name: "darkBrown", image: "/images/4Ppdarkbrown.jpeg"},
       { name: "gray", image: "/images/gray.jpeg"},
       { name: "red", image: "/images/4PRed.png"}
@@ -36,7 +36,7 @@ export const Products = [
       { name: "green", image: "/images/4pocketGreen.png", default: true },
       { name: "black", image: "/images/4pocketBlack.png" },
       { name: "blue", image: "/images/4pocketBlue.png" },
-      { name: "silver", image: "/images/4ppsilver.jpeg"},
+      { name: "silver", image: "/images/4psilver.jpeg"},
       { name: "darkBrown", image: "/images/4Ppdarkbrown.jpeg"},
       { name: "gray", image: "/images/gray.jpeg"},
       { name: "red", image: "/images/4PRed.png"}
@@ -58,7 +58,7 @@ export const Products = [
       { name: "blue", image: "/images/4pocketBlue.png", default: true },
       { name: "black", image: "/images/4pocketBlack.png" },
       { name: "green", image: "/images/4pocketGreen.png" },
-      { name: "silver", image: "/images/4ppsilver.jpeg"},
+      { name: "silver", image: "/images/4psilver.jpeg"},
       { name: "darkBrown", image: "/images/4Ppdarkbrown.jpeg"},
       { name: "gray", image: "/images/gray.jpeg"},
       { name: "red", image: "/images/4PRed.png"}
@@ -82,7 +82,7 @@ export const Products = [
       { name: "black", image: "/images/4pocketBlack.png" },
       { name: "green", image: "/images/4pocketGreen.png" },
       { name: "blue", image: "/images/4pocketBlue.png"},
-      { name: "silver", image: "/images/4ppsilver.jpeg"},
+      { name: "silver", image: "/images/4psilver.jpeg"},
       { name: "darkBrown", image: "/images/4Ppdarkbrown.jpeg"},
       { name: "red", image: "/images/4PRed.png"}
     ]
@@ -103,7 +103,7 @@ export const Products = [
       { name: "black", image: "/images/4pocketBlack.png" },
       { name: "green", image: "/images/4pocketGreen.png" },
       { name: "blue", image: "/images/4pocketBlue.png"},
-      { name: "silver", image: "/images/4ppsilver.jpeg"},
+      { name: "silver", image: "/images/4psilver.jpeg"},
       { name: "darkBrown", image: "/images/4Ppdarkbrown.jpeg"},
       { name: "gray", image: "/images/gray.jpeg"}
 
@@ -113,7 +113,7 @@ export const Products = [
     id: "7",
     name: "Perashot Bike Cover",
     price: 1200 ,
-    image: "/images/4ppsilver.jpeg",
+    image: "/images/4psilver.jpeg",
     category: "Parachute",
     description: ` Free delivery
  Open parcel allowed
@@ -121,7 +121,7 @@ export const Products = [
  1-year warranty`,
     quantity: 1,
     colors: [
-      { name: "silver", image: "/images/4ppsilver.jpeg", default: true },
+      { name: "silver", image: "/images/4psilver.jpeg", default: true },
       { name: "black", image: "/images/4pocketBlack.png" },
       { name: "green", image: "/images/4pocketGreen.png" },
       { name: "blue", image: "/images/4pocketBlue.png"},
@@ -148,7 +148,7 @@ export const Products = [
       { name: "green", image: "/images/4pocketGreen.png" },
       { name: "blue", image: "/images/4pocketBlue.png"},
       { name: "red", image: "/images/4PRed.png"},
-      { name: "silver", image: "/images/4ppsilver.jpeg"},
+      { name: "silver", image: "/images/4psilver.jpeg"},
       { name: "gray", image: "/images/gray.jpeg"}
 
     ]
