@@ -28,14 +28,14 @@ export default function Navbar() {
         {/* Logo + text */}
         <Link href="/" className="flex items-center gap-2 shrink-0">
           <Image
-            src="/images/binwatan.png"
+            src="/logo.png"
             alt="Bin Watan"
             width={40}
             height={20}
             className="object-contain"
           />
           <span className="text-white font-bold text-lg tracking-wide">
-            BIN WATAN
+            BIN <span className="text-[#F97316]">WATAN</span>
           </span>
         </Link>
 
