@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { supabaseClient } from "@/utils/supabase/client"
 import LoadingSpinner from "@/components/ui/LoadingSpinner"
-import { Pencil, Trash2, Check, X, Package, Truck, Clock, LogOut } from "lucide-react"
-import { AnyARecord } from "dns"
+import { Pencil, Trash2, Check, X, Package, Truck, Clock, LogOut, CaseUpper } from "lucide-react"
+import { AnyARecord } from "dns"  
 
 interface Order {
   id: string;
@@ -92,9 +92,9 @@ export default function AdminOrdersPage() {
           orderRefNumber: '404',
           invoicePayment: order.total,
           orderDetail: order.items
-            ?.map((i: any) => `${i.name} x${i.quantity}`)
+            ?.map((i: any) => `${i.name} x${i.quantity} | ${i.color.toUpperCase()} `)
             .join(", ") + 
-            (order.bike_specifications ? ` | Bike: ${order.bike_specifications}` : ""),          customerName: order.name,
+            (order.bike_specifications ? `| Bike: ${order.bike_specifications}` : ""),          customerName: order.name,
           customerPhone: order.phone,
           deliveryAddress: order.address,
           transactionNotes: "Allowed To Open",
@@ -246,7 +246,7 @@ export default function AdminOrdersPage() {
                   <ul className="space-y-2">
                     {order.items?.map((item: any, i: number) => (
                       <li key={i} className="flex justify-between text-xs border-b border-zinc-800/50 pb-1">
-                        <span className="text-black">{item.name} <span className="text-blue-500 font-bold">x{item.quantity} <span className="text-black"> {order.bike_specifications}</span></span></span>
+                        <span className="text-black">{item.name} <span className="text-blue-500 font-bold">x{item.quantity} <span className="text-black"> {order.bike_specifications}</span></span> {item.color.toUpperCase()}</span>
 
                         <span className="text-black">  PKR {item.price * item.quantity}</span>
                       </li>
