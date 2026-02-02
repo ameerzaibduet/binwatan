@@ -2,22 +2,20 @@
 
 import { useState } from "react"
 import { Check, ChevronsUpDown } from "lucide-react"
-import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/components/ui/popover"
 import {
   Command,
   CommandInput,
   CommandItem,
   CommandGroup,
   CommandList,
-  CommandEmpty,
 } from "@/components/ui/command"
-import {
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-} from "@/components/ui/popover"
-import { CITIES } from "@/lib/cities" // Ensure this path is correct
+import { CITIES } from "@/lib/cities"
 
 export default function CreateManualOrder() {
   const [account, setAccount] = useState("Khan Zaib")
@@ -28,18 +26,15 @@ export default function CreateManualOrder() {
     customerName: "",
     customerPhone: "",
     deliveryAddress: "",
-    cityName: "", // This will be handled by the Popover
+    cityName: "",
     invoicePayment: "",
+    orderDetail: "",
     items: 1,
     weight: 0.5,
   })
 
   const submit = async () => {
-    // Basic validation for City
-    if (!form.cityName) {
-      alert("Please select a city")
-      return
-    }
+    if (!form.cityName) return alert("Please select city")
 
     const res = await fetch("/api/postex/manual-create", {
       method: "POST",
@@ -48,165 +43,144 @@ export default function CreateManualOrder() {
         ...form,
         postexAccount: account,
         referenceId,
-        orderRefNumber: `WA-${Date.now()}`,
+        orderRefNumber: `MAN-${Date.now()}`,
       }),
     })
 
     const data = await res.json()
+    if (!data.success) return alert(data.error)
 
-    if (data.success) {
-      alert(`✅ Order Created\nTracking: ${data.trackingNumber}`)
-      setForm({
-        customerName: "",
-        customerPhone: "",
-        deliveryAddress: "",
-        cityName: "",
-        invoicePayment: "",
-        items: 1,
-        weight: 0.5,
-      })
-    } else {
-      alert(`❌ Order creation failed\n${data.error || ""}`)
-    }
+    alert(`✅ Order Created\nTracking: ${data.trackingNumber}`)
+    setForm({
+      customerName: "",
+      customerPhone: "",
+      deliveryAddress: "",
+      cityName: "",
+      invoicePayment: "",
+      orderDetail: "",
+      items: 1,
+      weight: 0.5,
+    })
   }
 
   return (
-    <div className="min-h-screen w-full bg-white flex items-center justify-center p-6 overflow-hidden">
-      <div className="w-full max-w-2xl">
-        
-        {/* Header Section */}
-        <div className="mb-8 flex justify-between items-end border-l-4 border-yellow-400 pl-4">
+    <div className="h-screen w-full bg-white flex items-center justify-center">
+      <div className="w-full max-w-3xl grid gap-4">
+
+        {/* HEADER */}
+        <div className="flex justify-between items-end border-l-4 border-yellow-400 pl-4">
           <div>
-            <h1 className="text-3xl font-black tracking-tighter uppercase">
-              <span className="text-black">PostEx</span>{" "}
-              <span className="text-gray-400">Manual</span>
-            </h1>
-            <p className="text-zinc-400 text-[10px] font-bold tracking-[0.3em] uppercase">
-              Shipment Creation Terminal
+            <h1 className="text-3xl font-black uppercase">PostEx Manual</h1>
+            <p className="text-[10px] text-zinc-400 tracking-widest">
+              SHIPMENT CREATION
             </p>
           </div>
-          <div>
-            <span className="bg-yellow-400 text-black text-[10px] font-black px-3 py-1 rounded-md uppercase tracking-wider shadow-sm">
-              Ready
-            </span>
-          </div>
+          <span className="bg-yellow-400 text-black text-xs font-black px-3 py-1 rounded">
+            READY
+          </span>
         </div>
 
-        {/* Account & Reference Selection */}
-        <div className="grid grid-cols-2 gap-4 mb-2 ">
-          <div className="flex flex-col gap-1">
-            <label className="text-black text-[11px] font-black uppercase ml-1">Account</label>
-            <select
-              value={account}
-              onChange={e => setAccount(e.target.value)}
-              className="w-full bg-zinc-100 text-black font-bold p-3 rounded-xl border-2 border-transparent focus:border-yellow-400 focus:bg-white outline-none cursor-pointer transition-all"
-            >
-              <option>Khan Zaib</option>
-              <option>Nasir</option>
-              <option>Usman</option>
-            </select>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-black text-[11px] font-black uppercase ml-1">Reference</label>
-            <select
-              value={referenceId}
-              onChange={e => setReferenceId(e.target.value)}
-              className="w-full bg-zinc-100 text-black font-bold p-3 rounded-xl border-2 border-transparent focus:border-yellow-400 focus:bg-white outline-none cursor-pointer transition-all"
-            >
-              <option>444</option>
-              <option>333</option>
-              <option>222</option>
-              <option>999</option>
-            </select>
-          </div>
-        </div>
-
-        <hr className="border-zinc-100 mb-8" />
-
-        {/* Input Field Grid */}
-        <div className="grid grid-cols-2 gap-x-4 gap-y-6">
-          {Object.entries(form).map(([key, value]) => {
-            const isCityField = key === "cityName"
-            const fullWidth = key === "deliveryAddress" || key === "customerName"
-
-            return (
-              <div key={key} className={`${fullWidth ? "col-span-2" : "col-span-1"} flex flex-col gap-1`}>
-                <label className="text-zinc-400 text-[10px] font-bold uppercase ml-1">
-                  {key.replace(/([A-Z])/g, " $1")}
-                </label>
-                
-                {isCityField ? (
-                  /* Searchable City Dropdown */
-                  <Popover open={cityOpen} onOpenChange={setCityOpen}>
-                    <PopoverTrigger asChild>
-                      <Button 
-                        variant="outline" 
-                        role="combobox"
-                        className="w-full justify-between bg-zinc-50 border-2 border-zinc-100 hover:bg-white hover:border-yellow-400 h-12 rounded-xl text-black font-semibold text-sm px-3"
-                      >
-                        {form.cityName || "Search city..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0 shadow-2xl rounded-xl border-zinc-100">
-                      <Command className="rounded-xl">
-                        <CommandInput placeholder="Search city..." className="h-12" />
-                        <CommandEmpty>No city found.</CommandEmpty>
-                        <CommandList className="max-h-64">
-                          <CommandGroup>
-                            {CITIES.map((c) => (
-                              <CommandItem
-                                key={c}
-                                onSelect={() => {
-                                  setForm({ ...form, cityName: c })
-                                  setCityOpen(false)
-                                }}
-                                className="flex items-center justify-between py-3 cursor-pointer"
-                              >
-                                {c}
-                                <Check
-                                  className={cn(
-                                    "ml-2 h-4 w-4 text-yellow-500",
-                                    form.cityName === c ? "opacity-100" : "opacity-0"
-                                  )}
-                                />
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                ) : (
-                  /* Regular Text/Number Inputs */
-                  <input
-                    type={typeof value === "number" ? "number" : "text"}
-                    placeholder={key.replace(/([A-Z])/g, " $1")}
-                    value={value as any}
-                    onChange={e => {
-                      const val = typeof value === "number" ? Number(e.target.value) : e.target.value
-                      setForm({ ...form, [key]: val })
-                    }}
-                    className="w-full bg-zinc-50 text-black font-semibold p-3 rounded-xl border-2 border-zinc-100 focus:border-yellow-400 focus:bg-white outline-none transition-all placeholder:text-zinc-200 text-sm"
-                  />
-                )}
-              </div>
-            )
-          })}
-        </div>
-
-        {/* Submit Button */}
-        <div className="pt-10">
-          <button
-            onClick={submit}
-            className="group relative w-full h-16 bg-black rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-[0_10px_30px_rgba(250,204,21,0.2)] active:scale-[0.98]"
+        {/* ACCOUNT */}
+        <div className="grid grid-cols-2 gap-4">
+          <select
+            value={account}
+            onChange={e => setAccount(e.target.value)}
+            className="input"
           >
-            <div className="absolute inset-0 bg-yellow-400 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
-            <span className="relative z-10 text-white group-hover:text-black font-black text-sm uppercase tracking-[0.3em] transition-colors duration-300">
-              Create Shipment
-            </span>
-          </button>
+            <option>Khan Zaib</option>
+            <option>Nasir</option>
+            <option>Usman</option>
+          </select>
+
+          <select
+            value={referenceId}
+            onChange={e => setReferenceId(e.target.value)}
+            className="input"
+          >
+            <option>444</option>
+            <option>333</option>
+            <option>222</option>
+          </select>
         </div>
+
+        {/* FORM */}
+        <div className="grid grid-cols-2 gap-3">
+          <input className="input col-span-2" placeholder="Customer Name"
+            value={form.customerName}
+            onChange={e => setForm({ ...form, customerName: e.target.value })}
+          />
+
+          <input className="input" placeholder="Customer Phone"
+            value={form.customerPhone}
+            onChange={e => setForm({ ...form, customerPhone: e.target.value })}
+          />
+
+          <input className="input" placeholder="Invoice Amount"
+            value={form.invoicePayment}
+            onChange={e => setForm({ ...form, invoicePayment: e.target.value })}
+          />
+
+          <input className="input col-span-2" placeholder="Delivery Address"
+            value={form.deliveryAddress}
+            onChange={e => setForm({ ...form, deliveryAddress: e.target.value })}
+          />
+
+          {/* CITY */}
+          <Popover open={cityOpen} onOpenChange={setCityOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="input col-span-2 justify-between">
+                {form.cityName || "Select City"}
+                <ChevronsUpDown className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="p-0">
+              <Command>
+                <CommandInput placeholder="Search city..." />
+                <CommandList>
+                  <CommandGroup>
+                    {CITIES.map(city => (
+                      <CommandItem
+                        key={city}
+                        onSelect={() => {
+                          setForm({ ...form, cityName: city })
+                          setCityOpen(false)
+                        }}
+                      >
+                        {city}
+                        {form.cityName === city && (
+                          <Check className="ml-auto h-4 w-4" />
+                        )}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+          
+          <input className="input col-span-2" placeholder="Order Detail"
+            value={form.orderDetail}
+            onChange={e => setForm({ ...form, orderDetail: e.target.value })}
+          />
+
+          <input className="input" type="number" placeholder="Items"
+            value={form.items}
+            onChange={e => setForm({ ...form, items: Number(e.target.value) })}
+          />
+
+          <input className="input" type="number" step="0.1" placeholder="Weight (kg)"
+            value={form.weight}
+            onChange={e => setForm({ ...form, weight: Number(e.target.value) })}
+          />
+        </div>
+
+        {/* SUBMIT */}
+        <button
+          onClick={submit}
+          className="h-14 bg-black text-white font-black rounded-xl hover:bg-yellow-400 hover:text-black transition"
+        >
+          CREATE SHIPMENT
+        </button>
       </div>
     </div>
   )
