@@ -3,7 +3,7 @@ export const Products = [
     id: "4",
     name: "Parachute Bike Cover",
     price: 1200 ,
-    image: "/images/4pocketBlack.png",
+    image: "/images/4pocketBlack.jpeg",
     category: "Parachute",
     description: ` Free delivery
  Open parcel allowed
@@ -11,7 +11,7 @@ export const Products = [
  1-year warranty`,
     quantity: 1,
     colors: [
-      { name: "black", image: "/images/4pocketBlack.png", default: true },
+      { name: "black", image: "/images/4pocketBlack.jpeg", default: true },
       { name: "green", image: "/images/4pocketGreen.png" },
       { name: "blue", image: "/images/4pocketBlue.png" },
       { name: "silver", image: "/images/4psilver.jpeg"},
@@ -34,7 +34,7 @@ export const Products = [
     quantity: 1,
     colors: [
       { name: "green", image: "/images/4pocketGreen.png", default: true },
-      { name: "black", image: "/images/4pocketBlack.png" },
+      { name: "black", image: "/images/4pocketBlack.jpeg" },
       { name: "blue", image: "/images/4pocketBlue.png" },
       { name: "silver", image: "/images/4psilver.jpeg"},
       { name: "darkBrown", image: "/images/4Ppdarkbrown.jpeg"},
@@ -56,7 +56,7 @@ export const Products = [
     quantity: 1,
     colors: [
       { name: "blue", image: "/images/4pocketBlue.png", default: true },
-      { name: "black", image: "/images/4pocketBlack.png" },
+      { name: "black", image: "/images/4pocketBlack.jpeg" },
       { name: "green", image: "/images/4pocketGreen.png" },
       { name: "silver", image: "/images/4psilver.jpeg"},
       { name: "darkBrown", image: "/images/4Ppdarkbrown.jpeg"},
@@ -79,7 +79,7 @@ export const Products = [
     quantity: 1,
     colors: [
       { name: "gray", image: "/images/gray.jpeg", default: true },
-      { name: "black", image: "/images/4pocketBlack.png" },
+      { name: "black", image: "/images/4pocketBlack.jpeg" },
       { name: "green", image: "/images/4pocketGreen.png" },
       { name: "blue", image: "/images/4pocketBlue.png"},
       { name: "silver", image: "/images/4psilver.jpeg"},
@@ -100,7 +100,7 @@ export const Products = [
     quantity: 1,
     colors: [
       { name: "red", image: "/images/4PRed.png", default: true },
-      { name: "black", image: "/images/4pocketBlack.png" },
+      { name: "black", image: "/images/4pocketBlack.jpeg" },
       { name: "green", image: "/images/4pocketGreen.png" },
       { name: "blue", image: "/images/4pocketBlue.png"},
       { name: "silver", image: "/images/4psilver.jpeg"},
@@ -122,7 +122,7 @@ export const Products = [
     quantity: 1,
     colors: [
       { name: "silver", image: "/images/4psilver.jpeg", default: true },
-      { name: "black", image: "/images/4pocketBlack.png" },
+      { name: "black", image: "/images/4pocketBlack.jpeg" },
       { name: "green", image: "/images/4pocketGreen.png" },
       { name: "blue", image: "/images/4pocketBlue.png"},
       { name: "red", image: "/images/4PRed.png"},
@@ -144,7 +144,7 @@ export const Products = [
     quantity: 1,
     colors: [
       { name: "darkbrown", image: "/images/4Ppdarkbrown.jpeg", default: true },
-      { name: "black", image: "/images/4pocketBlack.png" },
+      { name: "black", image: "/images/4pocketBlack.jpeg" },
       { name: "green", image: "/images/4pocketGreen.png" },
       { name: "blue", image: "/images/4pocketBlue.png"},
       { name: "red", image: "/images/4PRed.png"},
