@@ -16,9 +16,11 @@ import { Button } from "@/components/ui/button"
 const menuItems = [
   { name: "Dashboard", href: "/admin", icon: <FaTachometerAlt /> },
   { name: "Orders", href: "/admin/orders", icon: <FaBoxOpen /> },
-  { name: "Add Product", href: "/admin/products", icon: <FaPlus /> },
+  { name: "Manual Dashboard", href: "/admin/stock", icon: <FaChartBar /> },
+  { name: "Create Order", href: "/admin/create", icon: <FaPlus /> },
+
   { name: "Finance", href: "/admin/finance", icon: <FaDollarSign /> },
-  { name: "Stock", href: "/admin/stock", icon: <FaChartBar /> },
+  
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
