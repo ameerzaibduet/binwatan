@@ -1,37 +1,32 @@
 "use client"
-
 import { useEffect, useState, useMemo } from "react"
 import { supabaseClient } from "@/utils/supabase/client"
-import {
-  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  CartesianGrid, BarChart, Bar, PieChart, Pie, Cell, Legend
-} from "recharts"
 import { 
-  Banknote, ShoppingBag, Clock, TrendingUp, Package, 
-  ArrowUpRight, Filter, Download, MoreHorizontal 
-} from "lucide-react"
+  LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, 
+  CartesianGrid, PieChart, Pie, Cell, Legend, BarChart, Bar 
+} from "recharts"
 import dayjs from "dayjs"
 import isBetween from "dayjs/plugin/isBetween"
-import weekOfYear from "dayjs/plugin/weekOfYear"
 
+// CRITICAL FIX: Extend dayjs outside the component
 dayjs.extend(isBetween)
-dayjs.extend(weekOfYear)
 
-const COLORS = ['#000000', '#FACC15', '#4ade80', '#f87171'];
+const COLORS = ['#FB923C', '#000000', '#6366f1', '#10b981', '#ef4444', '#8b5cf6'];
 
-export default function ManualOrdersDashboard() {
+export default function PostExEnhancedDashboard() {
   const [orders, setOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [groupBy, setGroupBy] = useState<"daily" | "weekly" | "monthly">("daily")
   const [daysFilter, setDaysFilter] = useState(30)
+  const [selectedAccount, setSelectedAccount] = useState("All")
 
   useEffect(() => {
     const fetchOrders = async () => {
-      const { data, error } = await supabaseClient
+      const { data } = await supabaseClient
         .from("manual_orders")
         .select("*")
         .order("created_at", { ascending: false })
-      if (!error) setOrders(data || [])
+      setOrders(data || [])
       setLoading(false)
     }
     fetchOrders()
@@ -39,248 +34,236 @@ export default function ManualOrdersDashboard() {
 
   const analytics = useMemo(() => {
     const now = dayjs()
-    const cutoffDate = now.subtract(daysFilter, "day").startOf("day")
-    const filtered = orders.filter(o => dayjs(o.created_at).isAfter(cutoffDate))
+    const currentCutoff = now.subtract(daysFilter, "day")
+    const prevCutoff = currentCutoff.subtract(daysFilter, "day")
 
-    // Mapping charts and breakdowns
-    const chartMap: Record<string, any> = {}
-    const refMap: Record<string, any> = {}
+    // Filtered Data
+    const currentPeriod = orders.filter(o => 
+      dayjs(o.created_at).isAfter(currentCutoff) && 
+      (selectedAccount === "All" || o.postex_account === selectedAccount)
+    )
+    
+    const prevPeriod = orders.filter(o => 
+      dayjs(o.created_at).isBetween(prevCutoff, currentCutoff, 'day', '[]') && 
+      (selectedAccount === "All" || o.postex_account === selectedAccount)
+    )
 
-    filtered.forEach(o => {
-      // Time grouping
-      let label = ""
-      if (groupBy === "daily") label = dayjs(o.created_at).format("DD MMM")
-      else if (groupBy === "weekly") label = `Week ${dayjs(o.created_at).week()}`
-      else label = dayjs(o.created_at).format("MMM YYYY")
+    const chartMap: any = {}
+    const statusMap: any = {}
+    const bookerMap: any = {}
 
-      if (!chartMap[label]) chartMap[label] = { label, total: 0, dispatched: 0, revenue: 0, timestamp: dayjs(o.created_at).unix() }
-      chartMap[label].total += 1
-      if (o.dispatched) {
-        chartMap[label].dispatched += 1
-        chartMap[label].revenue += Number(o.invoice_payment || 0)
+    currentPeriod.forEach(o => {
+      let label = dayjs(o.created_at).format(groupBy === "daily" ? "DD MMM" : groupBy === "weekly" ? "WW" : "MMM YYYY")
+      if (!chartMap[label]) {
+        chartMap[label] = { label, dispatched: 0, delivered: 0, revDelivered: 0, revTotal: 0, time: dayjs(o.created_at).unix() }
       }
+      
+      const isDelivered = o.delivery_date !== null && o.delivery_date !== undefined
+      
+      chartMap[label].dispatched++
+      
+      if (isDelivered) {
+        chartMap[label].delivered++
+        chartMap[label].revDelivered += Number(o.invoice_payment || 0)
+      }
+      chartMap[label].revTotal += Number(o.invoice_payment || 0)
 
-      // Reference breakdown
-      const ref = o.referenceId || "Unknown"
-      refMap[ref] = (refMap[ref] || 0) + 1
+      const status = o.transaction_status || "Pending"
+      statusMap[status] = (statusMap[status] || 0) + 1
+
+      const booker = o.reference_id || "Direct"
+      if (!bookerMap[booker]) bookerMap[booker] = { name: booker, deliveredCount: 0, reward: 0 }
+      if (isDelivered) {
+        bookerMap[booker].deliveredCount++
+        bookerMap[booker].reward += 50 
+      }
     })
 
-    const graphData = Object.values(chartMap).sort((a, b) => a.timestamp - b.timestamp)
-    const refData = Object.entries(refMap).map(([name, value]) => ({ name, value }))
-    const totalRevenue = filtered.filter(o => o.dispatched).reduce((sum, o) => sum + Number(o.invoice_payment || 0), 0)
-    const dispatchedCount = filtered.filter(o => o.dispatched).length
-    const pendingCount = filtered.length - dispatchedCount
+    const graphData = Object.values(chartMap).sort((a: any, b: any) => a.time - b.time)
+    const statusData = Object.entries(statusMap).map(([name, value]) => ({ name, value }))
+    const bookerData = Object.values(bookerMap).sort((a: any, b: any) => b.reward - a.reward)
 
-    const pieData = [
-      { name: 'Dispatched', value: dispatchedCount },
-      { name: 'Pending', value: pendingCount }
-    ]
+    const curDelivered = currentPeriod.filter(o => o.delivery_date).length
+    const oldDelivered = prevPeriod.filter(o => o.delivery_date).length
+    const growth = oldDelivered ? (((curDelivered - oldDelivered) / oldDelivered) * 100).toFixed(1) : "100"
 
     return {
       graphData,
-      refData,
-      pieData,
-      recentOrders: filtered.slice(0, 5),
-      stats: { totalOrders: filtered.length, totalRevenue, dispatchedCount, pendingCount }
+      statusData,
+      bookerData,
+      stats: {
+        total: currentPeriod.length,
+        delivered: curDelivered,
+        revenue: currentPeriod.reduce((a, b) => a + Number(b.invoice_payment || 0), 0),
+        delRevenue: currentPeriod.filter(o => o.delivery_date).reduce((a, b) => a + Number(b.invoice_payment || 0), 0),
+        growth
+      },
+      accounts: Array.from(new Set(orders.map(o => o.postex_account))).filter(Boolean)
     }
-  }, [orders, daysFilter, groupBy])
+  }, [orders, daysFilter, groupBy, selectedAccount])
 
-  if (loading) return (
-    <div className="h-screen flex items-center justify-center bg-white">
-      <div className="flex flex-col items-center gap-4">
-        <div className="w-12 h-12 border-4 border-yellow-400 border-t-black rounded-full animate-spin"></div>
-        <p className="font-black text-black uppercase tracking-widest text-xs">Synchronizing Intelligence</p>
-      </div>
-    </div>
-  )
+  if (loading) return <div className="flex h-screen items-center justify-center font-bold text-orange-500">Syncing PostEx Data...</div>
 
   return (
-    <div className="min-h-screen bg-[#F8F8F8] text-black pb-12">
-      {/* Sidebar-style Nav Header */}
-      <nav className="bg-black text-white p-6 mb-8 flex justify-between items-center shadow-2xl">
-        <div className="flex items-center gap-4">
-          <div className="bg-yellow-400 p-2 rounded-lg">
-            <TrendingUp size={24} className="text-black" />
-          </div>
-          <h1 className="text-xl font-black uppercase tracking-tighter italic">PostEx <span className="text-yellow-400">Pro</span></h1>
-        </div>
-        <div className="flex gap-3">
-           <button className="bg-zinc-800 p-2 rounded-full hover:bg-yellow-400 hover:text-black transition-colors">
-            <Download size={18} />
-          </button>
-          <button className="bg-zinc-800 p-2 rounded-full hover:bg-yellow-400 hover:text-black transition-colors">
-            <Filter size={18} />
-          </button>
-        </div>
-      </nav>
-
-      <div className="max-w-[1500px] mx-auto px-6 space-y-8">
-        
-        {/* Top Control Bar */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-3xl shadow-sm border border-zinc-100">
-          <div className="flex gap-1 p-1 bg-zinc-100 rounded-2xl w-fit">
-            {[7, 30, 90].map(d => (
-              <button key={d} onClick={() => setDaysFilter(d)}
-                className={`px-6 py-2 rounded-xl font-bold text-xs uppercase tracking-widest transition-all ${daysFilter === d ? 'bg-black text-white shadow-lg' : 'text-zinc-500 hover:text-black'}`}>
-                {d}D
-              </button>
-            ))}
-          </div>
-          <div className="flex gap-2">
-            {["daily", "weekly", "monthly"].map(g => (
-              <button key={g} onClick={() => setGroupBy(g as any)}
-                className={`px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest border-2 transition-all ${groupBy === g ? 'border-yellow-400 bg-yellow-400 text-black' : 'border-zinc-100 text-zinc-400 hover:border-black hover:text-black'}`}>
-                {g}
-              </button>
-            ))}
-          </div>
+    <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-900 mx-0 md:mx-auto">
+      {/* Filters Header */}
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-8 bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-100">
+        <div>
+          <h1 className="text-xl md:text-2xl font-black text-slate-800 tracking-tighter">POSTEX DASHBOARD</h1>
+          <p className="text-[9px] md:text-[10px] font-bold text-slate-400">REAL-TIME PERFORMANCE TRACKING</p>
         </div>
 
-        {/* KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <KPICard label="Volume" value={analytics.stats.totalOrders} icon={ShoppingBag} trend="+12%" color="black" />
-          <KPICard label="Revenue" value={`₨${analytics.stats.totalRevenue.toLocaleString()}`} icon={Banknote} trend="+8.4%" color="yellow" />
-          <KPICard label="Fulfilled" value={analytics.stats.dispatchedCount} icon={Package} trend="+18%" color="white" />
-          <KPICard label="Backlog" value={analytics.stats.pendingCount} icon={Clock} trend="-2%" color="white" />
+        <button
+          onClick={async () => {
+            if (!confirm("Sync orders with PostEx?")) return
+            const res = await fetch("/api/postex/sync-orders", { method: "POST" })
+            const data = await res.json()
+            alert(data.success ? "✅ " + data.message : "❌ " + data.error)
+          }}
+          className="h-10 md:h-12 bg-orange-400 text-white font-bold rounded-xl hover:bg-orange-600 transition mb-4 md:mb-0 px-3 md:px-4"
+        >
+          SYNC ORDERS
+        </button>
+
+        <div className="flex flex-wrap gap-2 md:gap-4 items-center">
+          <select onChange={(e) => setSelectedAccount(e.target.value)} className="bg-slate-100 px-3 py-2 rounded-xl font-bold text-xs md:text-sm outline-none focus:ring-2 ring-orange-200">
+              <option value="All">All Accounts</option>
+              {analytics.accounts.map(acc => <option key={acc} value={acc}>{acc}</option>)}
+          </select>
+
+          {[7, 30, 90].map(d => (
+              <button key={d} onClick={() => setDaysFilter(d)} className={`px-3 py-2 rounded-xl font-bold text-xs md:text-sm transition-all ${daysFilter === d ? 'bg-orange-400 text-white shadow-lg shadow-orange-200' : 'bg-slate-100 hover:bg-slate-200'}`}>{d}D</button>
+          ))}
+
+          <div className="h-6 md:h-8 w-[1px] bg-slate-200 mx-1 md:mx-2" />
+
+          {["daily", "weekly", "monthly"].map(g => (
+              <button key={g} onClick={() => setGroupBy(g as any)} className={`px-3 py-2 rounded-xl font-bold text-xs md:text-sm uppercase transition-all ${groupBy === g ? 'bg-black text-white' : 'bg-slate-100 hover:bg-slate-200'}`}>{g}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* 1. KPI Row */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-2 md:gap-4 mb-8">
+        <Stat title="Total Orders" value={analytics.stats.total} />
+        <Stat title="Delivered" value={analytics.stats.delivered} />
+        <Stat title="Total Rev" value={`₨${analytics.stats.revenue.toLocaleString()}`} />
+        <Stat title="Delivered Rev" value={`₨${analytics.stats.delRevenue.toLocaleString()}`} />
+        <Stat title="Growth (vs Prev)" value={`${analytics.stats.growth}%`} highlight />
+      </div>
+
+      {/* 2. Dispatched vs Delivered Line Chart & Pie Ratio */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mb-6">
+        <div className="lg:col-span-2">
+          <ChartCard title="Order Volume: Dispatched vs Delivered">
+              <LineChart data={analytics.graphData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="label" fontSize={9} tickLine={false} axisLine={false} />
+                  <YAxis fontSize={9} tickLine={false} axisLine={false} />
+                  <Tooltip contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)'}} />
+                  <Line type="monotone" dataKey="dispatched" stroke="#000" strokeWidth={2} name="Dispatched" dot={{ r: 3, fill: '#000' }} />
+                  <Line type="monotone" dataKey="delivered" stroke="#FB923C" strokeWidth={2} name="Delivered" dot={{ r: 3, fill: '#FB923C' }} />
+              </LineChart>
+          </ChartCard>
         </div>
 
-        {/* Analytics Row 1 */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Revenue Area Chart */}
-          <div className="lg:col-span-2 bg-white rounded-[2.5rem] p-8 shadow-xl border border-zinc-100">
-            <div className="flex justify-between items-start mb-8">
-              <div>
-                <h3 className="text-lg font-black uppercase tracking-tight">Financial Trajectory</h3>
-                <p className="text-zinc-400 text-xs font-bold">Revenue performance over selected period</p>
-              </div>
-              <ArrowUpRight className="text-yellow-500" />
-            </div>
-            <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={analytics.graphData}>
-                  <defs>
-                    <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#FACC15" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#FACC15" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid vertical={false} stroke="#f0f0f0" />
-                  <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{fontSize:10, fontWeight:'bold'}} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{fontSize:10, fontWeight:'bold'}} />
-                  <Tooltip contentStyle={{borderRadius:'15px', border:'none', boxShadow:'0 10px 15px -3px rgba(0,0,0,0.1)'}} />
-                  <Area type="monotone" dataKey="revenue" stroke="#000" fill="url(#revGrad)" strokeWidth={4} dot={{r:4, fill:'#000'}} activeDot={{r:8, fill:'#FACC15'}} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
+        <ChartCard title="Delivery Success Ratio">
+          <PieChart>
+            <Pie data={[
+                {name: 'Delivered', value: analytics.stats.delivered}, 
+                {name: 'Not Delivered', value: analytics.stats.total - analytics.stats.delivered}
+            ]} innerRadius={50} outerRadius={70} paddingAngle={4} dataKey="value">
+                <Cell fill="#FB923C" stroke="none" />
+                <Cell fill="#f1f5f9" stroke="none" />
+            </Pie>
+            <Tooltip />
+            <Legend verticalAlign="bottom" iconType="circle" />
+          </PieChart>
+        </ChartCard>
+      </div>
 
-          {/* Pie Chart: Status Distribution */}
-          <div className="bg-white rounded-[2.5rem] p-8 shadow-xl border border-zinc-100">
-            <h3 className="text-lg font-black uppercase tracking-tight mb-6">Market Share</h3>
-            <div className="h-64 relative">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={analytics.pieData} innerRadius={60} outerRadius={80} paddingAngle={10} dataKey="value">
-                    {analytics.pieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                  <Legend iconType="circle" />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-2xl font-black">{Math.round((analytics.stats.dispatchedCount / analytics.stats.totalOrders) * 100)}%</span>
-                <span className="text-[10px] font-bold text-zinc-400 uppercase">Success</span>
-              </div>
+      {/* 3. Revenue Analysis Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mb-6">
+        <ChartCard title="Total Projected Revenue (All Orders)">
+            <LineChart data={analytics.graphData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="label" fontSize={9} />
+                <YAxis fontSize={9} />
+                <Tooltip />
+                <Line type="step" dataKey="revTotal" stroke="#000" strokeWidth={2} dot={false} />
+            </LineChart>
+        </ChartCard>
+        <ChartCard title="Actual Realized Revenue (Delivered Only)">
+            <LineChart data={analytics.graphData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="label" fontSize={9} />
+                <YAxis fontSize={9} />
+                <Tooltip />
+                <Line type="step" dataKey="revDelivered" stroke="#FB923C" strokeWidth={2} dot={false} />
+            </LineChart>
+        </ChartCard>
+      </div>
+
+      {/* 4. Booker Rewards & Transaction Status */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+        <div className="lg:col-span-2 bg-white p-4 md:p-8 rounded-3xl shadow-sm border border-slate-100 min-w-0">
+            <div className="flex justify-between items-center mb-4 md:mb-6">
+                <h3 className="font-black text-[9px] md:text-xs uppercase tracking-widest text-slate-400">Booker Reward Table (₨50/Delivery)</h3>
+                <span className="bg-orange-100 text-orange-600 text-[8px] md:text-[10px] px-2 py-1 rounded-md font-black">TOP PERFORMERS</span>
             </div>
-          </div>
+            <div className="overflow-x-auto">
+                <table className="w-full text-left min-w-[300px]">
+                    <thead>
+                        <tr className="text-[8px] md:text-[10px] uppercase text-slate-400 border-b border-slate-50">
+                            <th className="pb-2">Booker Reference</th>
+                            <th className="pb-2 text-center">Deliveries</th>
+                            <th className="pb-2 text-right">Payout Reward</th>
+                        </tr>
+                    </thead>
+                    <tbody className="text-sm">
+                        {analytics.bookerData.map((b: any) => (
+                            <tr key={b.name} className="border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors">
+                                <td className="py-2 md:py-4 font-bold text-slate-700">{b.name}</td>
+                                <td className="py-2 md:py-4 text-center font-black">{b.deliveredCount}</td>
+                                <td className="py-2 md:py-4 text-right font-black text-orange-500 underline decoration-orange-200 underline-offset-2">₨{b.reward.toLocaleString()}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
         </div>
 
-        {/* Analytics Row 2 */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Table: Recent Orders */}
-          <div className="lg:col-span-2 bg-white rounded-[2.5rem] overflow-hidden shadow-xl border border-zinc-100 flex flex-col">
-            <div className="p-8 border-b border-zinc-50 flex justify-between items-center">
-              <h3 className="text-lg font-black uppercase tracking-tight">Latest Entries</h3>
-              <button className="text-xs font-bold text-zinc-400 hover:text-black">View All Activity</button>
-            </div>
-            <div className="overflow-x-auto p-4">
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="text-[10px] font-black uppercase text-zinc-400 tracking-widest border-b border-zinc-100">
-                    <th className="px-4 py-3">Reference</th>
-                    <th className="px-4 py-3">Customer</th>
-                    <th className="px-4 py-3">City</th>
-                    <th className="px-4 py-3 text-right">Payment</th>
-                    <th className="px-4 py-3 text-center">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-50">
-                  {analytics.recentOrders.map((o: any, i: number) => (
-                    <tr key={i} className="group hover:bg-zinc-50 transition-colors">
-                      <td className="px-4 py-4 text-xs font-black">{o.referenceId || '--'}</td>
-                      <td className="px-4 py-4">
-                        <p className="text-xs font-bold">{o.customerName}</p>
-                        <p className="text-[10px] text-zinc-400">{o.customerPhone}</p>
-                      </td>
-                      <td className="px-4 py-4 text-[10px] font-bold uppercase">{o.cityName}</td>
-                      <td className="px-4 py-4 text-xs font-black text-right">₨{o.invoice_payment}</td>
-                      <td className="px-4 py-4 text-center">
-                        <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${o.dispatched ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'}`}>
-                          {o.dispatched ? 'Shipped' : 'Staged'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Efficiency Bar Chart */}
-          <div className="bg-white rounded-[2.5rem] p-8 shadow-xl border border-zinc-100">
-            <h3 className="text-lg font-black uppercase tracking-tight mb-6">Workload Balance</h3>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={analytics.graphData}>
-                  <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{fontSize:9, fontWeight:'bold'}} />
-                  <Tooltip cursor={{fill: '#f8f8f8'}} />
-                  <Bar dataKey="total" fill="#E5E7EB" radius={[10, 10, 0, 0]} barSize={20} />
-                  <Bar dataKey="dispatched" fill="#000000" radius={[10, 10, 0, 0]} barSize={20} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </div>
-
+        <ChartCard title="Transaction Status Distribution">
+            <BarChart data={analytics.statusData} layout="vertical" margin={{ left: 20 }}>
+                <XAxis type="number" hide />
+                <YAxis dataKey="name" type="category" fontSize={8} width={80} tick={{fontWeight: 'bold'}} />
+                <Tooltip cursor={{fill: '#fff7ed'}} />
+                <Bar dataKey="value" fill="#000" radius={[0, 10, 10, 0]} barSize={16} />
+            </BarChart>
+        </ChartCard>
       </div>
     </div>
   )
 }
 
-function KPICard({ label, value, icon: Icon, trend, color }: any) {
-  const themes: any = {
-    black: 'bg-black text-white shadow-black/20',
-    yellow: 'bg-yellow-400 text-black shadow-yellow-400/20',
-    white: 'bg-white text-black border border-zinc-100 shadow-sm'
-  }
-  
+/* ================= Styled Components ================= */
+function Stat({ title, value, highlight = false }: any) {
   return (
-    <div className={`${themes[color]} p-8 rounded-[2rem] shadow-xl flex flex-col justify-between h-44 group hover:scale-[1.02] transition-transform cursor-default`}>
-      <div className="flex justify-between items-start">
-        <div className={`p-3 rounded-2xl ${color === 'black' ? 'bg-zinc-800' : color === 'yellow' ? 'bg-black/10' : 'bg-zinc-100'}`}>
-          <Icon size={20} className={color === 'yellow' ? 'text-black' : color === 'black' ? 'text-yellow-400' : 'text-zinc-600'} />
-        </div>
-        <div className="flex flex-col items-end">
-          <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${trend.startsWith('+') ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}`}>
-            {trend}
-          </span>
-        </div>
-      </div>
-      <div>
-        <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${color === 'black' ? 'text-zinc-500' : 'text-zinc-400'}`}>{label}</p>
-        <h2 className="text-3xl font-black tracking-tighter">{value}</h2>
+    <div className={`p-4 md:p-6 rounded-3xl shadow-sm border transition-all hover:scale-[1.02] ${highlight ? 'border-orange-400 bg-orange-400 text-white' : 'bg-white border-slate-100'}`}>
+      <p className={`text-[9px] md:text-[10px] font-black uppercase mb-1 tracking-widest ${highlight ? 'text-orange-100' : 'text-slate-400'}`}>{title}</p>
+      <h3 className="text-xl md:text-2xl font-black">{value}</h3>
+    </div>
+  )
+}
+
+function ChartCard({ title, children }: any) {
+  return (
+    <div className="bg-white p-4 md:p-8 rounded-3xl shadow-sm border border-slate-100 min-w-0">
+      <h3 className="font-black mb-4 md:mb-8 text-[9px] md:text-[10px] uppercase tracking-widest text-slate-400">{title}</h3>
+      <div className="h-64 min-w-0">
+        <ResponsiveContainer width="100%" height="100%">
+          {children}
+        </ResponsiveContainer>
       </div>
     </div>
   )

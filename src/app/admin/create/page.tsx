@@ -64,7 +64,35 @@ export default function CreateManualOrder() {
   }
 
   return (
-    <div className="h-screen w-full bg-white flex items-center justify-center">
+
+
+    <div className="h-screen w-full bg-white  items-center justify-center">
+
+      <button
+  onClick={async () => {
+
+    if (!confirm("Sync orders with PostEx?")) return
+
+    const res = await fetch("/api/postex/sync-orders", {
+      method: "POST",
+    })
+
+    const data = await res.json()
+
+    if (!data.success) {
+      alert("❌ " + data.error)
+      return
+    }
+
+    alert("✅ " + data.message)
+  }}
+
+  className="h-12 bg-orange-400 text-white font-bold rounded-xl hover:bg-orange-600 transition mb-6 px-4"
+>
+  SYNC ORDERS
+</button>
+
+
       <div className="w-full max-w-3xl grid gap-4">
 
         {/* HEADER */}
