@@ -23,7 +23,7 @@ export const Products = [
   },
  {
     id: "2",
-    name: "Perashot Bike Cover",
+    name: "Parachute Bike Cover",
     price: 1200 ,
     image: "/images/4pocketGreen.png",
     category: "Parachute",
@@ -45,7 +45,7 @@ export const Products = [
   },
   {
     id: "3",
-    name: "Perashot Bike Cover",
+    name: "Parachute Bike Cover",
     price: 1200 ,
     image: "/images/4pocketBlue.png",
     category: "Parachute",
@@ -68,7 +68,7 @@ export const Products = [
 
     {
     id: "5",
-    name: "Perashot Bike Cover",
+    name: "Parachute Bike Cover",
     price: 1200 ,
     image: "/images/gray.jpeg",
     category: "Parachute",
@@ -89,7 +89,7 @@ export const Products = [
   },
    {
     id: "6",
-    name: "Perashot Bike Cover",
+    name: "Parachute Bike Cover",
     price: 1200 ,
     image: "/images/4PRed.png",
     category: "Parachute",
@@ -111,7 +111,7 @@ export const Products = [
   },
    {
     id: "7",
-    name: "Perashot Bike Cover",
+    name: "Parachute Bike Cover",
     price: 1200 ,
     image: "/images/4psilver.jpeg",
     category: "Parachute",
@@ -133,7 +133,7 @@ export const Products = [
   },
    {
     id: "8",
-    name: "Perashot Bike Cover",
+    name: "Parachute Bike Cover",
     price: 1200 ,
     image: "/images/4Ppdarkbrown.jpeg",
     category: "Parachute",
