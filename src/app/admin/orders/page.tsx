@@ -43,9 +43,10 @@ export default function AdminOrdersPage() {
   const fetchOrders = async () => {
     setStatus("Syncing with database...")
     const { data, error } = await supabaseClient
-      .from("orders")
-      .select("*")
-      .order("created_at", { ascending: false })
+  .from("orders")
+  .select("*")
+  .range(0, 9999) // fetch up to 10,000 rows
+  .order("created_at", { ascending: false })
 
     if (error) {
       setStatus("Failed to load orders.")

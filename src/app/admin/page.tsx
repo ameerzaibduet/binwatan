@@ -3,256 +3,270 @@
 import { useEffect, useState, useMemo } from "react"
 import { supabaseClient } from "@/utils/supabase/client"
 import {
-  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  CartesianGrid, BarChart, Bar, Cell, PieChart, Pie
+  LineChart, Line, XAxis, YAxis, Tooltip,
+  ResponsiveContainer, CartesianGrid,
+  BarChart, Bar,
+  PieChart, Pie, Cell, Legend
 } from "recharts"
-import { 
-  ShoppingBag, Banknote, Clock, ArrowUpRight, ArrowDownRight,
-  Inbox, Calendar, Filter, TrendingUp, BarChart3, Package
-} from "lucide-react"
 import dayjs from "dayjs"
-import isBetween from "dayjs/plugin/isBetween"
 import weekOfYear from "dayjs/plugin/weekOfYear"
 
-dayjs.extend(isBetween)
 dayjs.extend(weekOfYear)
 
-export default function AdminDashboardPage() {
+/* ================= KPI CARD ================= */
+
+function KPICard({ title, value }: { title: string; value: string | number }) {
+  return (
+    <div className="bg-white rounded-2xl shadow-md border-l-4 border-orange-400 p-4 min-h-[100px] flex flex-col justify-between">
+      <p className="text-[11px] text-slate-500 uppercase font-semibold tracking-wide">
+        {title}
+      </p>
+      <h2 className="text-xl md:text-2xl font-bold text-black mt-2 break-words">
+        {value}
+      </h2>
+    </div>
+  )
+}
+
+export default function DashboardPage() {
+
   const [orders, setOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  
-  // DEFAULT FILTERS
-  const [groupBy, setGroupBy] = useState<"daily" | "weekly" | "monthly">("daily")
   const [daysFilter, setDaysFilter] = useState(30)
+  const [groupBy, setGroupBy] = useState<"daily" | "weekly" | "monthly" | "yearly">("daily")
+
+  /* ================= FETCH ALL ORDERS ================= */
 
   useEffect(() => {
     const fetchOrders = async () => {
-      const { data, error } = await supabaseClient
-        .from("orders")
-        .select("id, created_at, dispatched, total")
-      if (!error) setOrders(data || [])
+
+      let allOrders: any[] = []
+      let from = 0
+      const limit = 1000
+      let hasMore = true
+
+      while (hasMore) {
+        const { data, error } = await supabaseClient
+          .from("orders")
+          .select("id, created_at, dispatched, total")
+          .range(from, from + limit - 1)
+
+        if (error) break
+
+        if (data && data.length > 0) {
+          allOrders = [...allOrders, ...data]
+          from += limit
+        } else {
+          hasMore = false
+        }
+      }
+
+      setOrders(allOrders)
       setLoading(false)
     }
+
     fetchOrders()
   }, [])
 
+  /* ================= FILTER ================= */
+
+  const filteredOrders = useMemo(() => {
+    const fromDate = dayjs().subtract(daysFilter, "day")
+    return orders.filter(o => dayjs(o.created_at).isAfter(fromDate))
+  }, [orders, daysFilter])
+
+  /* ================= KPIs ================= */
+
+  const totalOrders = filteredOrders.length
+  const totalRevenue = filteredOrders.reduce((sum, o) => sum + Number(o.total || 0), 0)
+  const dispatchedOrders = filteredOrders.filter(o => o.dispatched === true).length
+  const unbookedOrders = filteredOrders.filter(o => !o.dispatched).length
+
+  /* ================= GROUP ANALYTICS ================= */
+
   const analytics = useMemo(() => {
-    const now = dayjs()
-    const cutoffDate = now.subtract(daysFilter, 'day').startOf('day')
-    
-    // 1. FILTER DATA BY SELECTED RANGE
-    const filteredOrders = orders.filter(o => dayjs(o.created_at).isAfter(cutoffDate))
-    
-    // 2. MOM COMPARISON DATA (Previous equivalent period)
-    const prevCutoffStart = cutoffDate.subtract(daysFilter, 'day')
-    const prevOrders = orders.filter(o => 
-      dayjs(o.created_at).isBetween(prevCutoffStart, cutoffDate)
-    )
 
-    // 3. GROUPING LOGIC FOR GRAPHS
-    const chartMap: any = {}
-    
+    const grouped: Record<string, any> = {}
+
     filteredOrders.forEach(o => {
-      let label = ""
-      if (groupBy === "daily") label = dayjs(o.created_at).format("DD MMM")
-      else if (groupBy === "weekly") label = `Week ${dayjs(o.created_at).week()}`
-      else if (groupBy === "monthly") label = dayjs(o.created_at).format("MMM YYYY")
 
-      if (!chartMap[label]) {
-        chartMap[label] = { label, totalVolume: 0, dispatchedVolume: 0, revenue: 0, timestamp: dayjs(o.created_at).unix() }
+      let label = ""
+
+      if (groupBy === "daily") {
+        label = dayjs(o.created_at).format("DD MMM")
+      } else if (groupBy === "weekly") {
+        label = `W${dayjs(o.created_at).week()}`
+      } else if (groupBy === "monthly") {
+        label = dayjs(o.created_at).format("MMM YYYY")
+      } else {
+        label = dayjs(o.created_at).format("YYYY")
       }
-      
-      chartMap[label].totalVolume += 1
-      if (o.dispatched) {
-        chartMap[label].dispatchedVolume += 1
-        chartMap[label].revenue += (o.total || 0)
+
+      if (!grouped[label]) {
+        grouped[label] = { revenue: 0, orders: 0 }
       }
+
+      grouped[label].revenue += Number(o.total || 0)
+      grouped[label].orders += 1
     })
 
-    const graphData = Object.values(chartMap).sort((a: any, b: any) => a.timestamp - b.timestamp)
+    return Object.entries(grouped).map(([label, data]) => ({
+      label,
+      revenue: data.revenue,
+      orders: data.orders
+    }))
 
-    // 4. STAT CALCULATIONS
-    const currentRevenue = filteredOrders.filter(o => o.dispatched).reduce((s, o) => s + (o.total || 0), 0)
-    const prevRevenue = prevOrders.filter(o => o.dispatched).reduce((s, o) => s + (o.total || 0), 0)
-    
-    const unbookedCount = orders.filter(o => !o.dispatched).length
+  }, [filteredOrders, groupBy])
 
-    return {
-      graphData,
-      stats: {
-        totalRevenue: currentRevenue,
-        revenueGrowth: prevRevenue === 0 ? 0 : ((currentRevenue - prevRevenue) / prevRevenue) * 100,
-        totalOrders: filteredOrders.length,
-        volumeGrowth: prevOrders.length === 0 ? 0 : ((filteredOrders.length - prevOrders.length) / prevOrders.length) * 100,
-        unbookedCount,
-        dispatchedCount: filteredOrders.filter(o => o.dispatched).length,
-      }
-    }
-  }, [orders, daysFilter, groupBy])
+  const statusData = [
+    { name: "Dispatched", value: dispatchedOrders },
+    { name: "Unbooked", value: unbookedOrders }
+  ]
 
-  if (loading) return <div className="h-screen flex items-center justify-center font-black text-slate-400 animate-pulse uppercase tracking-[0.3em]">Syncing Terminal...</div>
+  if (loading) {
+    return <div className="p-6 text-center">Loading dashboard...</div>
+  }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] p-6 lg:p-10 text-slate-900 font-sans">
-      <div className="max-w-[1500px] mx-auto space-y-8">
-        
-        {/* GLOBAL FILTER COMMAND BAR */}
-        <header className="bg-white rounded-[2rem] p-4 shadow-sm border border-slate-100 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-4 px-4">
-            <div className="w-10 h-10 bg-black rounded-xl flex items-center justify-center text-white"><BarChart3 size={20}/></div>
-            <h1 className="font-black text-xl tracking-tighter uppercase">Operations <span className="text-orange-500">Hub</span></h1>
-          </div>
+    <div className="bg-gray-50 min-h-screen p-4 md:p-8 space-y-8">
 
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Range Select */}
-            <div className="flex bg-slate-100 p-1 rounded-xl">
-              {[7, 30, 90].map((d) => (
-                <button key={d} onClick={() => setDaysFilter(d)}
-                  className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${daysFilter === d ? "bg-white text-black shadow-sm" : "text-slate-400 hover:text-slate-600"}`}>
-                  {d} Days
-                </button>
-              ))}
-            </div>
-            
-            <div className="w-[1px] h-6 bg-slate-200 mx-1 hidden md:block" />
+      {/* HEADER */}
+      <div>
+        <h1 className="text-2xl md:text-3xl font-bold text-black">
+          Dashboard Overview
+        </h1>
+        <p className="text-sm text-slate-500 mt-1">
+          Performance insights
+        </p>
+      </div>
 
-            {/* Grouping Select */}
-            <div className="flex bg-slate-100 p-1 rounded-xl">
-              {["daily", "weekly", "monthly"].map((g) => (
-                <button key={g} onClick={() => setGroupBy(g as any)}
-                  className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${groupBy === g ? "bg-black text-white" : "text-slate-400 hover:text-slate-600"}`}>
-                  {g}
-                </button>
-              ))}
-            </div>
-          </div>
-        </header>
+      {/* KPI GRID */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <KPICard title="Total Orders" value={totalOrders} />
+        <KPICard title="Revenue" value={`Rs ${totalRevenue.toLocaleString()}`} />
+        <KPICard title="Dispatched" value={dispatchedOrders} />
+        <KPICard title="Unbooked" value={unbookedOrders} />
+      </div>
 
-        {/* TOP KPI CARDS */}
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <KPICard 
-            label="Booked Revenue" 
-            value={`₨${analytics.stats.totalRevenue.toLocaleString()}`} 
-            growth={analytics.stats.revenueGrowth}
-            icon={Banknote} 
-            color="orange"
-          />
-          <KPICard 
-            label="Order Intake" 
-            value={analytics.stats.totalOrders} 
-            growth={analytics.stats.volumeGrowth}
-            icon={ShoppingBag} 
-            color="black"
-          />
-          <div className="bg-black rounded-[2.5rem] p-8 text-white relative overflow-hidden group">
-            <div className="relative z-10">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 bg-red-500 rounded-xl flex items-center justify-center"><Clock size={20}/></div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Total Unbooked</p>
-              </div>
-              <h2 className="text-5xl font-black italic">{analytics.stats.unbookedCount}</h2>
-              <p className="text-[10px] font-bold text-red-500 uppercase mt-2 animate-pulse">Action required in PostEx Booking</p>
-            </div>
-            <Inbox className="absolute -bottom-4 -right-4 opacity-10 group-hover:scale-110 transition-transform" size={140} />
-          </div>
-        </section>
+      {/* FILTERS */}
+      <div className="flex flex-wrap gap-3">
+        {[7, 30, 90, 365].map((d) => (
+          <button
+            key={d}
+            onClick={() => setDaysFilter(d)}
+            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+              daysFilter === d
+                ? "bg-orange-400 text-black shadow-md"
+                : "bg-black text-white hover:bg-orange-400 hover:text-black"
+            }`}
+          >
+            {d === 365 ? "1 Year" : `${d} Days`}
+          </button>
+        ))}
+      </div>
 
-        {/* REVENUE TRAJECTORY CHART */}
-        <div className="bg-white rounded-[3rem] p-10 border border-slate-100 shadow-xl shadow-slate-200/40">
-          <div className="mb-10">
-            <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-2">
-              <TrendingUp className="text-orange-500" /> Revenue Trajectory
-            </h3>
-            <p className="text-xs font-bold text-slate-400">Total cash value of dispatched items ({groupBy})</p>
-          </div>
-          <div className="h-[350px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={analytics.graphData}>
-                <defs>
-                  <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#f97316" stopOpacity={0.15}/>
-                    <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 800}} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10}} />
-                <Tooltip content={<RevenueTooltip />} cursor={{stroke: '#f97316', strokeWidth: 1}} />
-                <Area type="monotone" dataKey="revenue" stroke="#f97316" strokeWidth={4} fill="url(#revGrad)" />
-              </AreaChart>
+      {/* GROUPING */}
+      <div className="flex flex-wrap gap-3">
+        {["daily", "weekly", "monthly", "yearly"].map((g) => (
+          <button
+            key={g}
+            onClick={() => setGroupBy(g as any)}
+            className={`px-4 py-2 rounded-xl text-xs font-semibold capitalize transition-all ${
+              groupBy === g
+                ? "bg-orange-400 text-black shadow-md"
+                : "bg-black text-white hover:bg-orange-400 hover:text-black"
+            }`}
+          >
+            {g}
+          </button>
+        ))}
+      </div>
+
+      {/* REVENUE CHART */}
+      <div className="bg-white rounded-2xl shadow-md p-4">
+        <h3 className="text-lg font-bold mb-4 text-black">Revenue Trend</h3>
+
+        <div className="w-full overflow-x-auto">
+          <div className="min-w-[600px] md:min-w-0">
+            <ResponsiveContainer width="100%" height={350}>
+              <LineChart data={analytics}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="label"
+                  angle={-45}
+                  textAnchor="end"
+                  height={70}
+                  tick={{ fontSize: 10 }}
+                />
+                <YAxis tick={{ fontSize: 10 }} />
+                <Tooltip />
+                <Line
+                  type="monotone"
+                  dataKey="revenue"
+                  stroke="#fb923c"
+                  strokeWidth={3}
+                  dot={false}
+                />
+              </LineChart>
             </ResponsiveContainer>
           </div>
         </div>
+      </div>
 
-        {/* LOGISTICS VOLUME CHART */}
-        <div className="bg-white rounded-[3rem] p-10 border border-slate-100 shadow-xl shadow-slate-200/40">
-          <div className="flex justify-between items-center mb-10">
-            <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-2">
-              <Package className="text-black" /> Booking Efficiency
-            </h3>
-            <div className="flex gap-4">
-               <div className="flex items-center gap-2 text-[10px] font-black uppercase"><div className="w-2 h-2 rounded-full bg-slate-200" /> Total</div>
-               <div className="flex items-center gap-2 text-[10px] font-black uppercase"><div className="w-2 h-2 rounded-full bg-orange-500" /> Booked</div>
-            </div>
-          </div>
-          <div className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={analytics.graphData} barGap={8}>
-                <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 800}} />
-                <Tooltip cursor={{fill: '#f8fafc'}} content={<VolumeTooltip />} />
-                <Bar dataKey="totalVolume" fill="#e2e8f0" radius={[4, 4, 4, 4]} barSize={20} />
-                <Bar dataKey="dispatchedVolume" fill="#f97316" radius={[4, 4, 4, 4]} barSize={20} />
+      {/* ORDERS BAR CHART */}
+      <div className="bg-white rounded-2xl shadow-md p-4">
+        <h3 className="text-lg font-bold mb-4 text-black">Orders Trend</h3>
+
+        <div className="w-full overflow-x-auto">
+          <div className="min-w-[600px] md:min-w-0">
+            <ResponsiveContainer width="100%" height={350}>
+              <BarChart data={analytics}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="label"
+                  angle={-45}
+                  textAnchor="end"
+                  height={70}
+                  tick={{ fontSize: 10 }}
+                />
+                <YAxis tick={{ fontSize: 10 }} />
+                <Tooltip />
+                <Bar
+                  dataKey="orders"
+                  fill="#000000"
+                  radius={[6, 6, 0, 0]}
+                />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
-
       </div>
+
+      {/* PIE CHART */}
+      <div className="bg-white rounded-2xl shadow-md p-4">
+        <h3 className="text-lg font-bold mb-4 text-black">
+          Status Breakdown
+        </h3>
+
+        <ResponsiveContainer width="100%" height={320}>
+          <PieChart>
+            <Pie
+              data={statusData}
+              dataKey="value"
+              nameKey="name"
+              outerRadius={90}
+              innerRadius={50}
+              label
+            >
+              <Cell fill="#fb923c" />
+              <Cell fill="#000000" />
+            </Pie>
+            <Tooltip />
+            <Legend verticalAlign="bottom" height={36} />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+
     </div>
   )
-}
-
-function KPICard({ label, value, growth, icon: Icon, color }: any) {
-  const isPositive = growth >= 0
-  return (
-    <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-100/30">
-      <div className="flex justify-between items-start mb-6">
-        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${color === 'orange' ? 'bg-orange-50 text-orange-600' : 'bg-slate-50 text-black'}`}>
-          <Icon size={24} />
-        </div>
-        <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-black ${isPositive ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
-          {isPositive ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
-          {Math.abs(Math.round(growth))}%
-        </div>
-      </div>
-      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{label}</p>
-      <h4 className="text-3xl font-black tracking-tighter italic">{value}</h4>
-    </div>
-  )
-}
-
-const RevenueTooltip = ({ active, payload }: any) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-black text-white p-4 rounded-2xl shadow-2xl border border-white/10">
-        <p className="text-[10px] font-black text-slate-500 uppercase mb-1">{payload[0].payload.label}</p>
-        <p className="text-xl font-black text-orange-500">₨{payload[0].value.toLocaleString()}</p>
-        <p className="text-[9px] font-bold text-slate-400 uppercase">Settled Revenue</p>
-      </div>
-    )
-  }
-  return null
-}
-
-const VolumeTooltip = ({ active, payload }: any) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-white p-4 rounded-xl shadow-xl border border-slate-100">
-        <p className="text-[10px] font-black text-slate-400 uppercase mb-2">{payload[0].payload.label}</p>
-        <p className="text-sm font-black">Total: {payload[0].value}</p>
-        <p className="text-sm font-black text-orange-500">Booked: {payload[1].value}</p>
-      </div>
-    )
-  }
-  return null
 }
