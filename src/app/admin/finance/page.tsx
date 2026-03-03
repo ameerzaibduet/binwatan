@@ -1,200 +1,305 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { format } from "date-fns"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
+import { useRouter } from "next/navigation"
 import { supabaseClient } from "@/utils/supabase/client"
 
-type Received = {
-  id: string
-  name: string
-  amount: number
-  details: string
-  created_at: string
-}
+export default function AdminDashboard() {
+  const router = useRouter()
 
-type Expense = {
-  id: string
-  reason: string
-  amount: number
-  details: string
-  created_at: string
-}
+  const [workers, setWorkers] = useState<any[]>([])
+  const [records, setRecords] = useState<any[]>([])
+  const [selectedWorker, setSelectedWorker] = useState("")
+  const [products, setProducts] = useState("")
+  const [rate, setRate] = useState("")
+  const [amountTaken, setAmountTaken] = useState("")
+  const [editing, setEditing] = useState<any>(null)
+  const [message, setMessage] = useState("")
 
-type Sale = {
-  id: string
-  name: string
-  amount: number
-  details: string
-  paid: boolean
-  created_at: string
-}
-
-export default function FinancePage() {
-  const [received, setReceived] = useState<Received[]>([])
-  const [expenses, setExpenses] = useState<Expense[]>([])
-  const [sales, setSales] = useState<Sale[]>([])
-
-  const [loading, setLoading] = useState(false)
-
-  const [receivedName, setReceivedName] = useState("")
-  const [receivedAmount, setReceivedAmount] = useState("")
-  const [receivedDetails, setReceivedDetails] = useState("")
-
-  const [expenseReason, setExpenseReason] = useState("")
-  const [expenseAmount, setExpenseAmount] = useState("")
-  const [expenseDetails, setExpenseDetails] = useState("")
-
-  const [saleName, setSaleName] = useState("")
-  const [saleAmount, setSaleAmount] = useState("")
-  const [saleDetails, setSaleDetails] = useState("")
-
-  const fetchData = async () => {
-    setLoading(true)
-    const { data: r } = await supabaseClient.from("finance_received").select("*")
-    const { data: e } = await supabaseClient.from("finance_expenses").select("*")
-    const { data: s } = await supabaseClient.from("finance_sales").select("*")
-
-    setReceived(r || [])
-    setExpenses(e || [])
-    setSales(s || [])
-    setLoading(false)
-  }
-
+  // Load workers (only role=worker)
   useEffect(() => {
-    fetchData()
+    const loadWorkers = async () => {
+      const { data } = await supabaseClient
+        .from("workers")
+        .select("id, name")
+        .eq("role", "worker")
+
+      setWorkers(data || [])
+    }
+
+    loadWorkers()
   }, [])
 
-  const handleAddReceived = async () => {
-    await supabaseClient.from("finance_received").insert({
-      name: receivedName,
-      amount: parseFloat(receivedAmount),
-      details: receivedDetails
-    })
-    setReceivedName("")
-    setReceivedAmount("")
-    setReceivedDetails("")
-    fetchData()
+  // Load history
+  useEffect(() => {
+    const loadRecords = async () => {
+      const { data } = await supabaseClient
+        .from("worker_progress")
+        .select(`
+          id,
+          products_stitched,
+          rate_per_cover,
+          amount_taken,
+          total,
+          workers (name)
+        `)
+        .order("created_at", { ascending: false })
+
+      setRecords(data || [])
+    }
+
+    loadRecords()
+  }, [])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setMessage("")
+
+    const total = Number(products) * Number(rate)
+
+    if (editing) {
+      await supabaseClient
+        .from("worker_progress")
+        .update({
+          worker_id: selectedWorker,
+          products_stitched: Number(products),
+          rate_per_cover: Number(rate),
+          amount_taken: Number(amountTaken),
+          total,
+        })
+        .eq("id", editing.id)
+
+      setMessage("Record updated ✅")
+      setEditing(null)
+    } else {
+      await supabaseClient
+        .from("worker_progress")
+        .insert({
+          worker_id: selectedWorker,
+          products_stitched: Number(products),
+          rate_per_cover: Number(rate),
+          amount_taken: Number(amountTaken),
+          total,
+        })
+
+      setMessage("Record added successfully ✅")
+    }
+
+    setProducts("")
+    setRate("")
+    setAmountTaken("")
+
+    // reload history
+    const { data } = await supabaseClient
+      .from("worker_progress")
+      .select(`
+        id,
+        products_stitched,
+        rate_per_cover,
+        amount_taken,
+        total,
+        workers (name)
+      `)
+      .order("created_at", { ascending: false })
+
+    setRecords(data || [])
   }
 
-  const handleAddExpense = async () => {
-    await supabaseClient.from("finance_expenses").insert({
-      reason: expenseReason,
-      amount: parseFloat(expenseAmount),
-      details: expenseDetails
-    })
-    setExpenseReason("")
-    setExpenseAmount("")
-    setExpenseDetails("")
-    fetchData()
+  const handleEdit = (record: any) => {
+    setEditing(record)
+    setSelectedWorker(record.worker_id)
+    setProducts(record.products_stitched)
+    setRate(record.rate_per_cover)
+    setAmountTaken(record.amount_taken)
   }
 
-  const handleAddSale = async () => {
-    await supabaseClient.from("finance_sales").insert({
-      name: saleName,
-      amount: parseFloat(saleAmount),
-      details: saleDetails,
-      paid: false
-    })
-    setSaleName("")
-    setSaleAmount("")
-    setSaleDetails("")
-    fetchData()
-  }
+  const handleDelete = async (id: string) => {
+    if (!confirm("Delete record?")) return
 
-  const handleMarkPaid = async (id: string) => {
-    await supabaseClient.from("finance_sales").update({ paid: true }).eq("id", id)
-    fetchData()
-  }
+    await supabaseClient
+      .from("worker_progress")
+      .delete()
+      .eq("id", id)
 
-  const handleDeleteSale = async (id: string) => {
-    await supabaseClient.from("finance_sales").delete().eq("id", id)
-    fetchData()
-  }
+    const { data } = await supabaseClient
+      .from("worker_progress")
+      .select(`
+        id,
+        products_stitched,
+        rate_per_cover,
+        amount_taken,
+        total,
+        workers (name)
+      `)
 
-  const totalReceived = received.reduce((sum, r) => sum + Number(r.amount), 0)
-  const totalExpenses = expenses.reduce((sum, e) => sum + Number(e.amount), 0)
-  const totalSales = sales.reduce((sum, s) => sum + Number(s.amount), 0)
-  const totalPaidSales = sales.filter(s => s.paid).reduce((sum, s) => sum + Number(s.amount), 0)
-  const net = totalReceived - totalExpenses
+    setRecords(data || [])
+  }
 
   return (
-    <div className="p-6 space-y-10">
-      <h1 className="text-3xl font-bold">Finance Dashboard</h1>
+    <div className="min-h-screen bg-gray-100 p-4 md:p-8">
+      <div className="max-w-5xl mx-auto">
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-green-100 p-4 rounded">
-          <h2 className="text-xl font-semibold">Total Received</h2>
-          <p className="text-2xl font-bold">Rs {totalReceived.toLocaleString()}</p>
+        {/* Header */}
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold text-black">
+            Admin Dashboard
+          </h1>
+
+          <button
+            onClick={() => router.push("/admin/create-user")}
+            className="bg-black text-white px-4 py-2 rounded-lg hover:bg-orange-400 hover:text-black transition"
+          >
+            Create User
+          </button>
         </div>
-        <div className="bg-red-100 p-4 rounded">
-          <h2 className="text-xl font-semibold">Total Expenses</h2>
-          <p className="text-2xl font-bold">Rs {totalExpenses.toLocaleString()}</p>
+
+        {/* Form Card */}
+        <div className="bg-white rounded-xl shadow p-6 mb-6">
+          <h2 className="text-lg font-semibold mb-4">
+            {editing ? "Edit Record" : "Add Daily Record"}
+          </h2>
+
+          {message && (
+            <div className="mb-4 text-sm text-green-600">
+              {message}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="grid md:grid-cols-2 gap-4">
+
+            {/* Worker Dropdown */}
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium mb-1">
+                Select Worker
+              </label>
+              <select
+                value={selectedWorker}
+                onChange={(e) => setSelectedWorker(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2"
+                required
+              >
+                <option value="">Select Worker</option>
+                {workers.map((worker) => (
+                  <option key={worker.id} value={worker.id}>
+                    {worker.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Products */}
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Products Stitched
+              </label>
+              <input
+                type="number"
+                required
+                value={products}
+                onChange={(e) => setProducts(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2"
+              />
+            </div>
+
+            {/* Rate */}
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Rate per Cover
+              </label>
+              <input
+                type="number"
+                required
+                value={rate}
+                onChange={(e) => setRate(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2"
+              />
+            </div>
+
+            {/* Amount Taken */}
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Amount Taken
+              </label>
+              <input
+                type="number"
+                required
+                value={amountTaken}
+                onChange={(e) => setAmountTaken(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2"
+              />
+            </div>
+
+            {/* Total (Auto) */}
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Total (Auto)
+              </label>
+              <input
+                type="text"
+                readOnly
+                value={Number(products || 0) * Number(rate || 0)}
+                className="w-full border rounded-lg px-3 py-2 bg-gray-100"
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="md:col-span-2 bg-black text-white py-2 rounded-lg hover:bg-orange-400 hover:text-black transition"
+            >
+              {editing ? "Update Record" : "Save Record"}
+            </button>
+
+          </form>
         </div>
-        <div className="bg-blue-100 p-4 rounded">
-          <h2 className="text-xl font-semibold">Net Amount</h2>
-          <p className="text-2xl font-bold">Rs {net.toLocaleString()}</p>
+
+        {/* History Table */}
+        <div className="bg-white rounded-xl shadow p-6">
+          <h2 className="text-lg font-semibold mb-4">
+            History
+          </h2>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-100">
+                  <th className="p-2 text-left">Worker</th>
+                  <th className="p-2 text-left">Products</th>
+                  <th className="p-2 text-left">Rate</th>
+                  <th className="p-2 text-left">Amount</th>
+                  <th className="p-2 text-left">Total</th>
+                  <th className="p-2 text-left">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {records.map((record) => (
+                  <tr key={record.id} className="border-b">
+                    <td className="p-2">{record.workers?.name}</td>
+                    <td className="p-2">{record.products_stitched}</td>
+                    <td className="p-2">{record.rate_per_cover}</td>
+                    <td className="p-2">{record.amount_taken}</td>
+                    <td className="p-2">{record.total}</td>
+                    <td className="p-2 space-x-2">
+                      <button
+                        onClick={() => handleEdit(record)}
+                        className="text-blue-600"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(record.id)}
+                        className="text-red-600"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
         </div>
-      </div>
 
-      {/* Received Form */}
-      <div className="border p-4 rounded space-y-4">
-        <h2 className="text-xl font-bold">Add Received Amount</h2>
-        <Input placeholder="Name" value={receivedName} onChange={(e) => setReceivedName(e.target.value)} />
-        <Input placeholder="Amount" value={receivedAmount} onChange={(e) => setReceivedAmount(e.target.value)} />
-        <Input placeholder="Details" value={receivedDetails} onChange={(e) => setReceivedDetails(e.target.value)} />
-        <Button onClick={handleAddReceived}>Add Received</Button>
-      </div>
-
-      {/* Expense Form */}
-      <div className="border p-4 rounded space-y-4">
-        <h2 className="text-xl font-bold">Add Expense</h2>
-        <Input placeholder="Reason" value={expenseReason} onChange={(e) => setExpenseReason(e.target.value)} />
-        <Input placeholder="Amount" value={expenseAmount} onChange={(e) => setExpenseAmount(e.target.value)} />
-        <Input placeholder="Details" value={expenseDetails} onChange={(e) => setExpenseDetails(e.target.value)} />
-        <Button onClick={handleAddExpense}>Add Expense</Button>
-      </div>
-
-      {/* Sales Form */}
-      <div className="border p-4 rounded space-y-4">
-        <h2 className="text-xl font-bold">Add Sale</h2>
-        <Input placeholder="Name" value={saleName} onChange={(e) => setSaleName(e.target.value)} />
-        <Input placeholder="Amount" value={saleAmount} onChange={(e) => setSaleAmount(e.target.value)} />
-        <Input placeholder="Details" value={saleDetails} onChange={(e) => setSaleDetails(e.target.value)} />
-        <Button onClick={handleAddSale}>Add Sale</Button>
-      </div>
-
-      {/* Sales Table */}
-      <div>
-        <h2 className="text-2xl font-semibold">Sales</h2>
-        <table className="w-full table-auto border mt-2">
-          <thead className="bg-gray-100">
-            <tr>
-              <th className="p-2 border">Name</th>
-              <th className="p-2 border">Amount</th>
-              <th className="p-2 border">Paid</th>
-              <th className="p-2 border">Date</th>
-              <th className="p-2 border">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sales.map((s) => (
-              <tr key={s.id} className="text-center">
-                <td className="p-2 border">{s.name}</td>
-                <td className="p-2 border">{s.amount}</td>
-                <td className="p-2 border">{s.paid ? "Yes" : "No"}</td>
-                <td className="p-2 border">{format(new Date(s.created_at), "dd-MM-yyyy")}</td>
-                <td className="p-2 border space-x-2">
-                  {!s.paid && (
-                    <Button onClick={() => handleMarkPaid(s.id)} size="sm">Mark Paid</Button>
-                  )}
-                  <Button variant="destructive" onClick={() => handleDeleteSale(s.id)} size="sm">Delete</Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
       </div>
     </div>
   )
