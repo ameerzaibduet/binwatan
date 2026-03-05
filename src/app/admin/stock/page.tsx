@@ -21,16 +21,43 @@ export default function PostExEnhancedDashboard() {
   const [selectedAccount, setSelectedAccount] = useState("All")
 
   useEffect(() => {
-    const fetchOrders = async () => {
-      const { data } = await supabaseClient
+  const fetchOrders = async () => {
+
+    let allOrders: any[] = []
+    let from = 0
+    const batchSize = 1000
+    let done = false
+
+    while (!done) {
+      const { data, error } = await supabaseClient
         .from("manual_orders")
         .select("*")
         .order("created_at", { ascending: false })
-      setOrders(data || [])
-      setLoading(false)
+        .range(from, from + batchSize - 1)
+
+      if (error) {
+        console.error(error)
+        break
+      }
+
+      if (data && data.length > 0) {
+        allOrders = [...allOrders, ...data]
+        from += batchSize
+
+        if (data.length < batchSize) {
+          done = true
+        }
+      } else {
+        done = true
+      }
     }
-    fetchOrders()
-  }, [])
+
+    setOrders(allOrders)
+    setLoading(false)
+  }
+
+  fetchOrders()
+}, [])
 
   const analytics = useMemo(() => {
     const now = dayjs()

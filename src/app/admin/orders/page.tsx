@@ -41,24 +41,47 @@ export default function AdminOrdersPage() {
   }, [])
 
   const fetchOrders = async () => {
-    setStatus("Syncing with database...")
+  setStatus("Syncing with database...")
+
+  let allOrders: any[] = []
+  let from = 0
+  const batchSize = 1000
+  let finished = false
+
+  while (!finished) {
     const { data, error } = await supabaseClient
-  .from("orders")
-  .select("*")
-  .range(0, 9999) // fetch up to 10,000 rows
-  .order("created_at", { ascending: false })
+      .from("orders")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .range(from, from + batchSize - 1)
 
     if (error) {
       setStatus("Failed to load orders.")
-    } else {
-      setOrders(data || [])
-      const pending = (data || []).filter((o: Order) => !o.dispatched)
-      setFilteredOrders(pending)
-      setFilterStatus("pending")
-      setStatus(null)
+      console.error(error)
+      break
     }
-    setLoading(false)
+
+    if (data && data.length > 0) {
+      allOrders = [...allOrders, ...data]
+      from += batchSize
+
+      if (data.length < batchSize) {
+        finished = true
+      }
+    } else {
+      finished = true
+    }
   }
+
+  setOrders(allOrders)
+
+  const pending = allOrders.filter((o: Order) => !o.dispatched)
+  setFilteredOrders(pending)
+  setFilterStatus("pending")
+
+  setStatus(null)
+  setLoading(false)
+}
 
   const confirmAction = (type: "delete" | "dispatch", id: string) => {
     setPopup({ type, id })

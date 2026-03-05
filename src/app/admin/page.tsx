@@ -34,6 +34,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [daysFilter, setDaysFilter] = useState(30)
   const [groupBy, setGroupBy] = useState<"daily" | "weekly" | "monthly" | "yearly">("daily")
+  const [syncStatus, setSyncStatus] = useState<string | null>(null)
 
   /* ================= FETCH ALL ORDERS ================= */
 
@@ -48,7 +49,7 @@ export default function DashboardPage() {
       while (hasMore) {
         const { data, error } = await supabaseClient
           .from("orders")
-          .select("id, created_at, dispatched, total")
+          .select("id, created_at, dispatched, total, delivery_date")
           .range(from, from + limit - 1)
 
         if (error) break
@@ -68,6 +69,27 @@ export default function DashboardPage() {
     fetchOrders()
   }, [])
 
+  /* ================= SYNC API CALL ================= */
+
+  const syncWebOrders = async () => {
+    setSyncStatus("Syncing orders...")
+
+    try {
+      const res = await fetch("/api/postex/sync-web-orders", { method: "POST" })
+      const data = await res.json()
+
+      if (data.success) {
+        setSyncStatus("Sync completed!")
+      } else {
+        setSyncStatus("Sync failed!")
+      }
+    } catch (err) {
+      setSyncStatus("Error syncing!")
+    }
+
+    setTimeout(() => setSyncStatus(null), 4000)
+  }
+
   /* ================= FILTER ================= */
 
   const filteredOrders = useMemo(() => {
@@ -80,9 +102,10 @@ export default function DashboardPage() {
   const totalOrders = filteredOrders.length
   const totalRevenue = filteredOrders.reduce((sum, o) => sum + Number(o.total || 0), 0)
   const dispatchedOrders = filteredOrders.filter(o => o.dispatched === true).length
-  const unbookedOrders = filteredOrders.filter(o => !o.dispatched).length
+  const deliveredOrders = filteredOrders.filter(o => o.delivery_date).length
+  const pendingOrders = totalOrders - deliveredOrders
 
-  /* ================= GROUP ANALYTICS ================= */
+  /* ================= GROUP ANALYTICS (SORTED & FIXED) ================= */
 
   const analytics = useMemo(() => {
 
@@ -102,25 +125,32 @@ export default function DashboardPage() {
         label = dayjs(o.created_at).format("YYYY")
       }
 
+      const time = dayjs(o.created_at).valueOf()
+
       if (!grouped[label]) {
-        grouped[label] = { revenue: 0, orders: 0 }
+        grouped[label] = { revenue: 0, orders: 0, delivered: 0, time }
       }
 
       grouped[label].revenue += Number(o.total || 0)
       grouped[label].orders += 1
+      if (o.delivery_date) grouped[label].delivered += 1
     })
 
-    return Object.entries(grouped).map(([label, data]) => ({
-      label,
-      revenue: data.revenue,
-      orders: data.orders
-    }))
+    return Object.entries(grouped)
+      .map(([label, data]: any) => ({
+        label,
+        revenue: data.revenue || 0,
+        orders: data.orders || 0,
+        delivered: data.delivered || 0,
+        time: data.time || 0
+      }))
+      .sort((a, b) => a.time - b.time) // DATE SORT FIX
 
   }, [filteredOrders, groupBy])
 
   const statusData = [
-    { name: "Dispatched", value: dispatchedOrders },
-    { name: "Unbooked", value: unbookedOrders }
+    { name: "Delivered", value: deliveredOrders },
+    { name: "Pending", value: pendingOrders }
   ]
 
   if (loading) {
@@ -130,22 +160,35 @@ export default function DashboardPage() {
   return (
     <div className="bg-gray-50 min-h-screen p-4 md:p-8 space-y-8">
 
-      {/* HEADER */}
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold text-black">
-          Dashboard Overview
-        </h1>
-        <p className="text-sm text-slate-500 mt-1">
-          Performance insights
-        </p>
+      {/* HEADER + SYNC BUTTON */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-black">
+            Dashboard Overview
+          </h1>
+          <p className="text-sm text-slate-500 mt-1">
+            Performance insights
+          </p>
+        </div>
+
+        <button
+          onClick={syncWebOrders}
+          className="bg-orange-400 text-black px-4 py-2 rounded-xl font-semibold shadow-md hover:bg-orange-500"
+        >
+          Sync Web Orders
+        </button>
       </div>
+
+      {syncStatus && (
+        <div className="text-center text-sm text-orange-600">{syncStatus}</div>
+      )}
 
       {/* KPI GRID */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <KPICard title="Total Orders" value={totalOrders} />
         <KPICard title="Revenue" value={`Rs ${totalRevenue.toLocaleString()}`} />
         <KPICard title="Dispatched" value={dispatchedOrders} />
-        <KPICard title="Unbooked" value={unbookedOrders} />
+        <KPICard title="Delivered" value={deliveredOrders} />
       </div>
 
       {/* FILTERS */}
@@ -182,70 +225,69 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* REVENUE CHART */}
+      {/* LINE GRAPH (REVENUE, ORDERS, DELIVERED) */}
       <div className="bg-white rounded-2xl shadow-md p-4">
-        <h3 className="text-lg font-bold mb-4 text-black">Revenue Trend</h3>
+        <h3 className="text-lg font-bold mb-4 text-black">
+          Revenue, Orders & Delivered Trend
+        </h3>
 
-        <div className="w-full overflow-x-auto">
-          <div className="min-w-[600px] md:min-w-0">
-            <ResponsiveContainer width="100%" height={350}>
-              <LineChart data={analytics}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis
-                  dataKey="label"
-                  angle={-45}
-                  textAnchor="end"
-                  height={70}
-                  tick={{ fontSize: 10 }}
-                />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip />
-                <Line
-                  type="monotone"
-                  dataKey="revenue"
-                  stroke="#fb923c"
-                  strokeWidth={3}
-                  dot={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+        <ResponsiveContainer width="100%" height={350}>
+          <LineChart data={analytics}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="label" />
+            <YAxis />
+            <Tooltip />
+
+            <Line
+              type="monotone"
+              dataKey="revenue"
+              stroke="#fb923c"
+              strokeWidth={3}
+              dot={false}
+            />
+
+            <Line
+              type="monotone"
+              dataKey="orders"
+              stroke="#000000"
+              strokeWidth={2}
+              dot={{ r: 3 }}
+            />
+
+            <Line
+              type="monotone"
+              dataKey="delivered"
+              stroke="#22c55e"
+              strokeWidth={2}
+              dot={{ r: 3 }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
       </div>
 
-      {/* ORDERS BAR CHART */}
+      {/* BAR CHART */}
       <div className="bg-white rounded-2xl shadow-md p-4">
         <h3 className="text-lg font-bold mb-4 text-black">Orders Trend</h3>
 
-        <div className="w-full overflow-x-auto">
-          <div className="min-w-[600px] md:min-w-0">
-            <ResponsiveContainer width="100%" height={350}>
-              <BarChart data={analytics}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis
-                  dataKey="label"
-                  angle={-45}
-                  textAnchor="end"
-                  height={70}
-                  tick={{ fontSize: 10 }}
-                />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip />
-                <Bar
-                  dataKey="orders"
-                  fill="#000000"
-                  radius={[6, 6, 0, 0]}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+        <ResponsiveContainer width="100%" height={350}>
+          <BarChart data={analytics}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="label" />
+            <YAxis />
+            <Tooltip />
+            <Bar
+              dataKey="orders"
+              fill="#000000"
+              radius={[6, 6, 0, 0]}
+            />
+          </BarChart>
+        </ResponsiveContainer>
       </div>
 
-      {/* PIE CHART */}
+      {/* STATUS PIE CHART */}
       <div className="bg-white rounded-2xl shadow-md p-4">
         <h3 className="text-lg font-bold mb-4 text-black">
-          Status Breakdown
+          Delivery Status
         </h3>
 
         <ResponsiveContainer width="100%" height={320}>
@@ -258,8 +300,8 @@ export default function DashboardPage() {
               innerRadius={50}
               label
             >
-              <Cell fill="#fb923c" />
-              <Cell fill="#000000" />
+              <Cell fill="#22c55e" />
+              <Cell fill="#ef4444" />
             </Pie>
             <Tooltip />
             <Legend verticalAlign="bottom" height={36} />
