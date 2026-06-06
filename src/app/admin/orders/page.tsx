@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { supabaseClient } from "@/utils/supabase/client"
 import LoadingSpinner from "@/components/ui/LoadingSpinner"
-import { Pencil, Trash2, Check, X, Package, Truck, Clock, LogOut, CaseUpper } from "lucide-react"
+import { Pencil, Trash2, Check, X, Package, Truck, Clock, LogOut, CaseUpper,LocateIcon} from "lucide-react"
 import { AnyARecord } from "dns"  
 
 interface Order {
@@ -39,7 +39,15 @@ export default function AdminOrdersPage() {
       fetchOrders()
     }
   }, [])
+const openLocation = (order: any) => {
+  if (!order.latitude || !order.longitude) {
+    alert("No GPS location found for this order")
+    return
+  }
 
+  const url = `https://www.google.com/maps?q=${order.latitude},${order.longitude}`
+  window.open(url, "_blank")
+}
   const fetchOrders = async () => {
   setStatus("Syncing with database...")
 
@@ -249,6 +257,7 @@ export default function AdminOrdersPage() {
                 {/* Content */}
                 <div className="space-y-3 text-sm border-t border-zinc-800 pt-4">
                   <div className="flex justify-between">
+                    
                     <span className="text-black">Phone:</span>
                     {editId === order.id ? 
                       <input className="bg-zinc-800 text-right text-blue-500" value={editedData.phone} onChange={(e) => setEditedData({...editedData, phone: e.target.value})} /> 
@@ -262,6 +271,14 @@ export default function AdminOrdersPage() {
                       : <span className="text-black leading-snug">{order.address}, <span className="text-orange-700">{order.city}</span></span>
                     }
                   </div>
+                  <Button
+  className="mt-2 bg-green-600"
+  onClick={() => openLocation(order)}
+> Location
+<LocateIcon className="w-4 h-4 mr-2" />
+
+</Button>
+                    
                 </div>
 
                 {/* Items */}
