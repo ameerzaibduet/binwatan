@@ -1,136 +1,203 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import Image from "next/image"
+import Link from "next/link"
 import { useParams } from "next/navigation"
-import { motion, AnimatePresence } from "framer-motion"
-import { ArrowRight, Filter, LayoutGrid, Sparkles, ShieldCheck, Truck } from "lucide-react"
-import { Product } from "@/types/product"
-import { Products } from "@/lib/products"
+import { AnimatePresence, motion } from "framer-motion"
+import { ArrowRight, PackageCheck, ShieldCheck, Truck } from "lucide-react"
 import ProductCard from "@/components/ProductCard"
+import { Products } from "@/lib/products"
+
+const categoryDetails: Record<string, { label: string; description: string }> = {
+  parachute: {
+    label: "Lightweight waterproof covers",
+    description:
+      "Built for everyday weather protection with a lightweight feel, easy handling, and multiple color choices.",
+  },
+  rexine: {
+    label: "Premium textured protection",
+    description:
+      "Designed for customers who prefer a stronger surface finish with a refined look and reliable coverage.",
+  },
+  "car top cover": {
+    label: "Measured vehicle top coverage",
+    description:
+      "Practical top-cover protection for compact vehicles with a clean fit and dependable waterproof material.",
+  },
+}
 
 export default function CategoryPage() {
   const params = useParams()
-  const categoryName = decodeURIComponent(params.name as string)
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>([])
-
-  useEffect(() => {
-    const data = Products.filter(
-      (p) => p.category.toLowerCase() === categoryName.toLowerCase()
-    )
-    setFilteredProducts(data)
-  }, [categoryName])
+  const rawParam = Array.isArray(params.name) ? params.name[0] : params.name
+  const requestedCategory = decodeURIComponent(rawParam || "")
+  const filteredProducts = Products.filter(
+    (product) => product.category.toLowerCase() === requestedCategory.toLowerCase()
+  )
+  const categoryName = filteredProducts[0]?.category || requestedCategory
+  const details = categoryDetails[categoryName.toLowerCase()] || {
+    label: "Premium collection",
+    description:
+      "Explore carefully selected products with practical protection, reliable delivery, and clear color choices.",
+  }
+  const heroProducts = filteredProducts.slice(0, 3)
+  const heroImage = heroProducts[0]?.image || "/newarrival.png"
 
   return (
-    <main className="min-h-screen bg-[#FDFDFD] text-slate-900 pb-24">
-      
-      {/* 🚀 MODERN HERO SECTION */}
-      <section className="relative h-[60vh] min-h-[500px] w-full flex items-center justify-center overflow-hidden bg-black">
-        {/* Abstract Background Elements */}
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[60%] bg-blue-600/20 blur-[120px] rounded-full" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[60%] bg-purple-600/20 blur-[120px] rounded-full" />
-        
-        <img
-          src={filteredProducts[0]?.image || "/newarrival.png"}
-          alt="Hero"
-          className="absolute inset-0 w-full h-full object-cover opacity-50 grayscale-[0.5]"
-        />
-        
-        {/* Content */}
-        <div className="relative z-10 text-center px-6">
+    <main className="min-h-screen bg-[#fbfbfa] pb-20 text-slate-950">
+      <section className="border-b border-slate-200 bg-white">
+        <div className="mx-auto grid max-w-7xl gap-10 px-6 py-14 md:py-20 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
           <motion.div
-            initial={{ opacity: 0, y: 30 }}
+            initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, ease: "easeOut" }}
+            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
           >
-            <span className="inline-block px-4 py-1.5 mb-6 text-xs font-bold tracking-[0.2em] text-orange-400 uppercase bg-blue-400/10 border border-orange-400/20 rounded-full backdrop-blur-md">
-              Premium Collection
-            </span>
-            <h1 className="text-6xl md:text-8xl font-black text-white tracking-tighter mb-6 uppercase italic">
-              {categoryName}<span className="text-orange-400">.</span>
-            </h1>
-            <p className="max-w-xl mx-auto text-gray-400 text-lg md:text-xl font-light leading-relaxed">
-              Engineering excellence meets modern aesthetics. Browse our signature {categoryName} lineup.
+            <p className="text-xs font-bold uppercase tracking-[0.3em] text-orange-500">
+              {details.label}
             </p>
+            <h1 className="mt-4 font-serif text-5xl tracking-tight text-slate-950 md:text-7xl">
+              {categoryName}
+            </h1>
+            <p className="mt-6 max-w-xl text-base leading-7 text-slate-600 md:text-lg">
+              {details.description}
+            </p>
+
+            <div className="mt-8 flex flex-wrap gap-3">
+              {[
+                `${filteredProducts.length} products`,
+                "Free delivery",
+                "Open parcel allowed",
+              ].map((item) => (
+                <span
+                  key={item}
+                  className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700"
+                >
+                  {item}
+                </span>
+              ))}
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, scale: 0.97 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+            className="grid grid-cols-1 gap-3 sm:grid-cols-[1.25fr_0.75fr]"
+          >
+            <div className="relative aspect-[4/3] overflow-hidden rounded-lg border border-slate-200 bg-[#f2f3ef]">
+              <Image
+                src={heroImage}
+                alt={`${categoryName} featured product`}
+                fill
+                priority
+                sizes="(min-width: 1024px) 55vw, 100vw"
+                className="object-contain p-6"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-1">
+              {(heroProducts.length > 1 ? heroProducts.slice(1, 3) : heroProducts).map(
+                (product) => (
+                  <div
+                    key={product.id}
+                    className="relative aspect-square overflow-hidden rounded-lg border border-slate-200 bg-[#f7f7f4]"
+                  >
+                    <Image
+                      src={product.image}
+                      alt={product.name}
+                      fill
+                      sizes="(min-width: 1024px) 20vw, 50vw"
+                      className="object-contain p-4"
+                    />
+                  </div>
+                )
+              )}
+              {heroProducts.length === 1 && (
+                <div className="flex aspect-square items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white p-5 text-center text-sm font-medium text-slate-500">
+                  More colors available inside
+                </div>
+              )}
+            </div>
           </motion.div>
         </div>
       </section>
 
-      
-      {/* 📦 PRODUCTS FEED */}
-      <section className="max-w-7xl mx-auto px-6 mt-20">
-    
+      <section className="mx-auto max-w-7xl px-6 py-14">
+        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-orange-500">
+              Collection
+            </p>
+            <h2 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">
+              Available {categoryName}
+            </h2>
+          </div>
+          <Link
+            href="/products"
+            className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-[0.16em] text-slate-800 transition-colors hover:text-orange-500"
+          >
+            View all products
+            <ArrowRight className="size-4" />
+          </Link>
+        </div>
 
         <AnimatePresence mode="wait">
           {filteredProducts.length > 0 ? (
-            <motion.div 
+            <motion.div
               layout
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8"
+              className="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
             >
               {filteredProducts.map((product) => (
                 <motion.div
                   key={product.id}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  whileInView={{ opacity: 1, scale: 1 }}
+                  initial={{ opacity: 0, y: 24 }}
+                  whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
-                  transition={{ duration: 0.4 }}
-                  whileHover={{ y: -10 }}
+                  transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
                 >
                   <ProductCard product={product} />
                 </motion.div>
               ))}
             </motion.div>
           ) : (
-            <div className="h-64 flex items-center justify-center border-2 border-dashed border-gray-200 rounded-[3rem]">
-              <p className="text-gray-400 font-medium italic">No matches found in the current collection.</p>
+            <div className="flex min-h-64 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center">
+              <p className="text-sm font-medium text-slate-500">
+                No products found in this collection yet.
+              </p>
             </div>
           )}
         </AnimatePresence>
       </section>
 
-          {/* 🛠️ BENTO INFO SECTION */}
-      <div className="max-w-7xl mx-auto px-6 mt-16 relative z-20">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white backdrop-blur-xl p-8 rounded-[1rem] border border-orange-400 shadow-xl shadow-black/10 flex items-center gap-5">
-            <div className="p-4 bg-orange-400 text-white rounded-2xl"><Truck size={24}/></div>
-            <div>
-              <h4 className="font-bold ">Fast Delivery</h4>
-              <p className="text-sm text-gray-200">Global shipping in 3-5 days</p>
+      <section className="mx-auto max-w-7xl px-6">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          {[
+            {
+              icon: Truck,
+              title: "Fast delivery",
+              desc: "Reliable delivery across Pakistan for every order.",
+            },
+            {
+              icon: ShieldCheck,
+              title: "Waterproof cover",
+              desc: "Protection made for dust, rain, and daily outdoor use.",
+            },
+            {
+              icon: PackageCheck,
+              title: "Open parcel",
+              desc: "Customers can check the parcel before accepting delivery.",
+            },
+          ].map((item) => (
+            <div
+              key={item.title}
+              className="rounded-lg border border-slate-200 bg-white p-6 shadow-[0_14px_40px_rgba(15,23,42,0.05)]"
+            >
+              <div className="mb-5 grid size-11 place-items-center rounded-md bg-orange-400 text-white">
+                <item.icon className="size-5" />
+              </div>
+              <h3 className="text-base font-bold text-slate-950">{item.title}</h3>
+              <p className="mt-2 text-sm leading-6 text-slate-600">{item.desc}</p>
             </div>
-          </div>
-          <div className="bg-white backdrop-blur-xl p-8 rounded-[1rem] border border-orange-400 shadow-xl shadow-black/10 flex items-center gap-5">
-            <div className="p-4 bg-orange-400 text-white rounded-2xl"><ShieldCheck size={24}/></div>
-            <div>
-              <h4 className="font-bold ">2-Year Warranty</h4>
-              <p className="text-sm text-gray-200">Guaranteed quality control</p>
-            </div>
-          </div>
-          <div className="bg-white backdrop-blur-xl p-8 rounded-[1rem] border border-orange-400 shadow-xl shadow-black/10 flex items-center gap-5">
-            <div className="p-4 bg-orange-400 text-white rounded-2xl"><Sparkles size={24}/></div>
-            <div>
-              <h4 className="font-bold ">Eco Friendly</h4>
-              <p className="text-sm text-gray-200">100% Sustainable packaging</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 📧 NEWSLETTER / CTA SECTION */}
-      <section className="max-w-7xl mx-auto px-6 mt-32">
-        <div className="relative overflow-hidden bg-slate-900 rounded-[3rem] p-12 md:p-20 flex flex-col items-center text-center">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-orange-400/20 blur-[100px]" />
-          <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">Join the Inner Circle</h2>
-          <p className="text-gray-400 max-w-lg mb-10">Get early access to limited edition drops and member-only pricing.</p>
-          
-          <div className="w-full max-w-md flex flex-col sm:flex-row gap-3">
-            <input 
-              type="email" 
-              placeholder="Enter your email" 
-              className="flex-1 h-14 px-6 rounded-2xl bg-orange-400/5 border border-white/10 text-white focus:outline-none focus:bg-white focus:border-blue-500 focus:text-black transition"
-            />
-            <button className="h-14 px-8 rounded-2xl bg-orange-400 text-white font-bold hover:bg-white hover:text-orange-400 transition flex items-center justify-center gap-2">
-              Subscribe <ArrowRight size={18}/>
-            </button>
-          </div>
+          ))}
         </div>
       </section>
     </main>

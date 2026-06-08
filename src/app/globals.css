@@ -120,3 +120,14 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  .category-scroll {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .category-scroll::-webkit-scrollbar {
+    display: none;
+  }
+}

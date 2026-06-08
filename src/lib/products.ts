@@ -233,5 +233,51 @@ export const Products = [
     ]
   },
 
+  {
+    id: "13",
+    name: "Car Top Cover",
+    price: 1200 ,
+    image: "/images/boolan-cover.png",
+    uncoveredImage: "/images/bolan.png",
+    category: "Car Top Cover",
+    carDetails: {
+      carName: "Suzuki Bolan",
+      fit: "Top cover fitting",
+      material: "Waterproof parachute"
+    },
+    description: ` Free delivery
+ Open parcel allowed
+ 100% waterproof
+ 1-year warranty`,
+    quantity: 1,
+    colors: [
+      { name: "Bolan", image: "/images/boolan-cover.png", default: true },
+      { name: "Bike", image: "/images/bike-cover.png"}
+    ]
+  },
+    {
+    id: "14",
+    name: "Bike Top Cover",
+    price: 1200 ,
+    image: "/images/bike-cover.png",
+    uncoveredImage: "/images/bike.png",
+    category: "Car Top Cover",
+    carDetails: {
+      carName: "Suzuki Bolan",
+      fit: "Top cover fitting",
+      material: "Waterproof parachute"
+    },
+    description: ` Free delivery
+ Open parcel allowed
+ 100% waterproof
+ 1-year warranty`,
+    quantity: 1,
+    colors: [
+      { name: "Bike", image: "/images/bike-cover.png", default: true },
+      { name: "Bolan", image: "/images/boolan-cover.png"}
+
+    ]
+  },
+
 
 ]

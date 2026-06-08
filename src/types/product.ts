@@ -3,7 +3,13 @@ export type Product = {
   name: string
   price: number
   image: string
+  uncoveredImage?: string
   category: string
+  carDetails?: {
+    carName: string
+    fit: string
+    material: string
+  }
   description: string
   quantity: number
   colors: {

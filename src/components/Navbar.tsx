@@ -19,7 +19,7 @@ export default function Navbar() {
   const [categoryOpen, setCategoryOpen] = useState(false)
 
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0)
-  const categories = ["Parachute", "Rexine"]
+  const categories = ["Parachute", "Rexine", "Car Top Cover"]
 
   return (
     <header className="bg-[#1E1E1E] shadow-md sticky top-0 z-50">
