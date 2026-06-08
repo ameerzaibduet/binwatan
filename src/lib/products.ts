@@ -236,7 +236,7 @@ export const Products = [
   {
     id: "13",
     name: "Car Top Cover",
-    price: 1200 ,
+    price: 2599 ,
     image: "/images/boolan-cover.png",
     uncoveredImage: "/images/bolan.png",
     category: "Car Top Cover",
@@ -252,7 +252,10 @@ export const Products = [
     quantity: 1,
     colors: [
       { name: "Bolan", image: "/images/boolan-cover.png", default: true },
-      { name: "Bike", image: "/images/bike-cover.png"}
+      { name: "Bike", image: "/images/bike-cover.png"},
+                  { name: "cultus", image: "/images/cultus-cover.png"},
+      { name: "Mehran", image: "/images/mehran-cover.png"},
+
     ]
   },
     {
@@ -263,7 +266,7 @@ export const Products = [
     uncoveredImage: "/images/bike.png",
     category: "Car Top Cover",
     carDetails: {
-      carName: "Suzuki Bolan",
+      carName: "Bike",
       fit: "Top cover fitting",
       material: "Waterproof parachute"
     },
@@ -274,7 +277,63 @@ export const Products = [
     quantity: 1,
     colors: [
       { name: "Bike", image: "/images/bike-cover.png", default: true },
-      { name: "Bolan", image: "/images/boolan-cover.png"}
+      { name: "Bolan", image: "/images/boolan-cover.png"},
+            { name: "cultus", image: "/images/cultus-cover.png"},
+      { name: "Mehran", image: "/images/mehran-cover.png"},
+
+
+    ]
+  },
+
+  {
+    id: "15",
+    name: "Cultus Top Cover",
+    price: 2599 ,
+    image: "/images/cultus-cover.png",
+    uncoveredImage: "/images/cultus.png",
+    category: "Car Top Cover",
+    carDetails: {
+      carName: "Suzuki Cultus",
+      fit: "Top cover fitting",
+      material: "Waterproof parachute"
+    },
+    description: ` Free delivery
+ Open parcel allowed
+ 100% waterproof
+ 1-year warranty`,
+    quantity: 1,
+    colors: [
+      { name: "cultus", image: "/images/cultus-cover.png", default: true },
+      { name: "Bolan", image: "/images/boolan-cover.png"},
+      { name: "Bike", image: "/images/bike-cover.png"},
+      { name: "Mehran", image: "/images/mehran-cover.png"},
+
+
+    ]
+  },
+  {
+    id: "16",
+    name: "Mehran Top Cover",
+    price: 2599 ,
+    image: "/images/mehran-cover.png",
+    uncoveredImage: "/images/mehran.png",
+    category: "Car Top Cover",
+    carDetails: {
+      carName: "Suzuki Mehran",
+      fit: "Top cover fitting",
+      material: "Waterproof parachute"
+    },
+    description: ` Free delivery
+ Open parcel allowed
+ 100% waterproof
+ 1-year warranty`,
+    quantity: 1,
+    colors: [
+      { name: "Mehran", image: "/images/mehran-cover.png", default: true },
+      { name: "Bolan", image: "/images/boolan-cover.png"},
+      { name: "Bike", image: "/images/bike-cover.png"},
+      { name: "cultus", image: "/images/cultus-cover.png"},
+      
 
     ]
   },

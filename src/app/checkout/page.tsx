@@ -164,8 +164,7 @@ export default function CheckoutPage() {
 
         <Input placeholder="Phone Number" value={number} onChange={(e) => setNumber(e.target.value)} />
 
-        <Input placeholder="Email (optional)" value={email} onChange={(e) => setEmail(e.target.value)} />
-
+      
         {/* CITY */}
         <Popover open={cityOpen} onOpenChange={setCityOpen}>
           <PopoverTrigger asChild>

@@ -7,6 +7,7 @@ import { Products } from "@/lib/products"
 import {
   getCarTopCoverTypes,
   getCarTypeForProduct,
+  getProductForCarType,
   isCarTopCoverProduct,
   type CarTypeOption,
 } from "@/lib/car-top-cover"
@@ -62,34 +63,52 @@ export default function ProductDetailPage({ params }: Props) {
     ? selectedCarType?.name
     : selectedColor?.name
 
+  const activeProduct =
+    isCarTopCover && selectedCarType
+      ? getProductForCarType(selectedCarType.productId) ?? product
+      : product
+
+  const displayPrice =
+    isCarTopCover && selectedCarType ? selectedCarType.price : product.price
+
   useEffect(() => {
     ttqTrack("ViewContent", {
-      content_id: product.id,
+      content_id: activeProduct.id,
       content_type: "product",
-      content_name: product.name,
-      price: product.price,
+      content_name: activeProduct.name,
+      price: displayPrice,
       currency: "PKR",
     })
-  }, [product])
+  }, [activeProduct, displayPrice])
 
   const handleAddToCart = () => {
-    addToCart({ ...product, quantity: 1, color: selectionLabel })
+    addToCart({
+      ...activeProduct,
+      image: mainImage,
+      quantity: 1,
+      color: selectionLabel,
+    })
     ttqTrack("AddToCart", {
-      content_id: product.id,
+      content_id: activeProduct.id,
       content_type: "product",
       quantity: 1,
-      price: product.price,
+      price: displayPrice,
       currency: "PKR",
     })
     openCart()
   }
 
   const handleBuyNow = () => {
-    addToCart({ ...product, quantity: 1, color: selectionLabel })
+    addToCart({
+      ...activeProduct,
+      image: mainImage,
+      quantity: 1,
+      color: selectionLabel,
+    })
     ttqTrack("InitiateCheckout", {
-      content_id: product.id,
+      content_id: activeProduct.id,
       content_type: "product",
-      value: product.price,
+      value: displayPrice,
       currency: "PKR",
     })
     closeCart()
@@ -165,6 +184,9 @@ export default function ProductDetailPage({ params }: Props) {
                           <span className="text-center text-xs font-semibold capitalize text-slate-800">
                             {carType.name}
                           </span>
+                          <span className="text-center text-[11px] font-bold text-orange-500">
+                            {formatPrice(carType.price)}
+                          </span>
                         </button>
                       )
                     })}
@@ -218,7 +240,7 @@ export default function ProductDetailPage({ params }: Props) {
             </h1>
 
             <p className="mt-5 text-3xl font-bold tabular-nums text-orange-500">
-              {formatPrice(product.price)}
+              {formatPrice(displayPrice)}
             </p>
 
             <div className="mt-6 flex flex-wrap gap-3">

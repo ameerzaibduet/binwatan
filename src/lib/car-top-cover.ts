@@ -7,6 +7,7 @@ export type CarTypeOption = {
   thumbnailImage: string
   uncoveredImage?: string
   productId: string
+  price: number
 }
 
 export function isCarTopCoverProduct(product: Product) {
@@ -22,10 +23,15 @@ export function getCarTopCoverTypes(): CarTypeOption[] {
       thumbnailImage: primary?.image ?? p.image,
       uncoveredImage: p.uncoveredImage,
       productId: p.id,
+      price: p.price,
     }
   })
 }
 
 export function getCarTypeForProduct(product: Product): CarTypeOption | undefined {
   return getCarTopCoverTypes().find((t) => t.productId === product.id)
+}
+
+export function getProductForCarType(productId: string) {
+  return Products.find((p) => p.id === productId)
 }
