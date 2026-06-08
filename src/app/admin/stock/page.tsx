@@ -7,6 +7,7 @@ import {
 } from "recharts"
 import dayjs from "dayjs"
 import isBetween from "dayjs/plugin/isBetween"
+import { syncAllManualOrders } from "@/lib/courier/sync-all"
 
 // CRITICAL FIX: Extend dayjs outside the component
 dayjs.extend(isBetween)
@@ -19,6 +20,8 @@ export default function PostExEnhancedDashboard() {
   const [groupBy, setGroupBy] = useState<"daily" | "weekly" | "monthly">("daily")
   const [daysFilter, setDaysFilter] = useState(30)
   const [selectedAccount, setSelectedAccount] = useState("All")
+  const [selectedCourier, setSelectedCourier] = useState("All")
+  const [syncing, setSyncing] = useState(false)
 
   useEffect(() => {
   const fetchOrders = async () => {
@@ -67,12 +70,14 @@ export default function PostExEnhancedDashboard() {
     // Filtered Data
     const currentPeriod = orders.filter(o => 
       dayjs(o.created_at).isAfter(currentCutoff) && 
-      (selectedAccount === "All" || o.postex_account === selectedAccount)
+      (selectedAccount === "All" || o.postex_account === selectedAccount) &&
+      (selectedCourier === "All" || (o.courier_provider || "postex") === selectedCourier)
     )
     
     const prevPeriod = orders.filter(o => 
       dayjs(o.created_at).isBetween(prevCutoff, currentCutoff, 'day', '[]') && 
-      (selectedAccount === "All" || o.postex_account === selectedAccount)
+      (selectedAccount === "All" || o.postex_account === selectedAccount) &&
+      (selectedCourier === "All" || (o.courier_provider || "postex") === selectedCourier)
     )
 
     const chartMap: any = {}
@@ -125,34 +130,45 @@ export default function PostExEnhancedDashboard() {
         delRevenue: currentPeriod.filter(o => o.delivery_date).reduce((a, b) => a + Number(b.invoice_payment || 0), 0),
         growth
       },
-      accounts: Array.from(new Set(orders.map(o => o.postex_account))).filter(Boolean)
+      accounts: Array.from(new Set(orders.map(o => o.postex_account))).filter(Boolean),
+      couriers: Array.from(new Set(orders.map(o => o.courier_provider || "postex"))).filter(Boolean),
     }
-  }, [orders, daysFilter, groupBy, selectedAccount])
+  }, [orders, daysFilter, groupBy, selectedAccount, selectedCourier])
 
-  if (loading) return <div className="flex h-screen items-center justify-center font-bold text-orange-500">Syncing PostEx Data...</div>
+  if (loading) return <div className="flex h-screen items-center justify-center font-bold text-orange-500">Loading courier data...</div>
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-900 mx-0 md:mx-auto">
       {/* Filters Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 mb-8 bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-100">
         <div>
-          <h1 className="text-xl md:text-2xl font-black text-slate-800 tracking-tighter">POSTEX DASHBOARD</h1>
-          <p className="text-[9px] md:text-[10px] font-bold text-slate-400">REAL-TIME PERFORMANCE TRACKING</p>
+          <h1 className="text-xl md:text-2xl font-black text-slate-800 tracking-tighter">MANUAL COURIER DASHBOARD</h1>
+          <p className="text-[9px] md:text-[10px] font-bold text-slate-400">POSTEX + NEXTSTEP · ACTIVE PARCEL SYNC ONLY</p>
         </div>
 
         <button
           onClick={async () => {
-            if (!confirm("Sync orders with PostEx?")) return
-            const res = await fetch("/api/postex/sync-orders", { method: "POST" })
-            const data = await res.json()
-            alert(data.success ? "✅ " + data.message : "❌ " + data.error)
+            if (!confirm("Sync active manual parcels from PostEx and NextStep?")) return
+            setSyncing(true)
+            try {
+              const data = await syncAllManualOrders()
+              alert(data.success ? "✅ " + data.message : "❌ Sync issue")
+            } finally {
+              setSyncing(false)
+            }
           }}
-          className="h-10 md:h-12 bg-orange-400 text-white font-bold rounded-xl hover:bg-orange-600 transition mb-4 md:mb-0 px-3 md:px-4"
+          disabled={syncing}
+          className="h-10 md:h-12 bg-orange-400 text-white font-bold rounded-xl hover:bg-orange-600 transition mb-4 md:mb-0 px-3 md:px-4 disabled:opacity-60"
         >
-          SYNC ORDERS
+          {syncing ? "SYNCING..." : "SYNC ORDERS"}
         </button>
 
         <div className="flex flex-wrap gap-2 md:gap-4 items-center">
+          <select onChange={(e) => setSelectedCourier(e.target.value)} className="bg-slate-100 px-3 py-2 rounded-xl font-bold text-xs md:text-sm outline-none focus:ring-2 ring-orange-200">
+              <option value="All">All Couriers</option>
+              {analytics.couriers.map((courier: string) => <option key={courier} value={courier}>{courier}</option>)}
+          </select>
+
           <select onChange={(e) => setSelectedAccount(e.target.value)} className="bg-slate-100 px-3 py-2 rounded-xl font-bold text-xs md:text-sm outline-none focus:ring-2 ring-orange-200">
               <option value="All">All Accounts</option>
               {analytics.accounts.map(acc => <option key={acc} value={acc}>{acc}</option>)}

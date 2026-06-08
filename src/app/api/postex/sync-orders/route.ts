@@ -1,156 +1,97 @@
 import { NextResponse } from "next/server"
 import axios from "axios"
+import { chunkArray } from "@/lib/courier/chunk"
+import { getSyncCutoffIso, shouldSyncOrder } from "@/lib/courier/sync-filters"
 import { POSTEX_ACCOUNTS } from "@/lib/postexAccounts"
 import { supabaseServer } from "@/utils/supabase/server"
 
-/* ------------------------------
-   Helper: Split array into chunks
---------------------------------*/
-function chunkArray(arr: string[], size: number) {
-  const result: string[][] = []
-
-  for (let i = 0; i < arr.length; i += size) {
-    result.push(arr.slice(i, i + size))
-  }
-
-  return result
-}
-
-/* ------------------------------
-   POST: Sync Orders With PostEx
---------------------------------*/
 export async function POST() {
   try {
-    /* ----------------------------------
-       1. Get Orders From Supabase
-    ---------------------------------- */
+    const cutoff = getSyncCutoffIso()
 
     const { data: orders, error } = await supabaseServer
       .from("manual_orders")
-      .select("id, tracking_number, postex_account")
+      .select("*")
       .not("tracking_number", "is", null)
+      .gte("created_at", cutoff)
 
     if (error) throw error
 
-    if (!orders || orders.length === 0) {
+    const eligible = (orders || []).filter((order) => {
+      if (order.courier_provider === "nextstep") return false
+      return shouldSyncOrder(order)
+    })
+
+    if (eligible.length === 0) {
       return NextResponse.json({
         success: true,
-        message: "No orders found",
+        message: "No PostEx orders to sync",
+        synced: 0,
+        skipped: orders?.length || 0,
       })
     }
 
-    /* ----------------------------------
-       2. Group Orders By Account
-    ---------------------------------- */
-
     const grouped: Record<string, string[]> = {}
 
-    for (const order of orders) {
-      if (!grouped[order.postex_account]) {
-        grouped[order.postex_account] = []
-      }
-
-      grouped[order.postex_account].push(order.tracking_number)
+    for (const order of eligible) {
+      const account = order.postex_account || "Khan Zaib"
+      if (!grouped[account]) grouped[account] = []
+      grouped[account].push(order.tracking_number)
     }
 
-    /* ----------------------------------
-       3. Process Each Account
-    ---------------------------------- */
+    let synced = 0
 
     for (const account in grouped) {
       const token = POSTEX_ACCOUNTS[account]
-
-      if (!token) {
-        console.log("Invalid token for account:", account)
-        continue
-      }
+      if (!token) continue
 
       const batches = chunkArray(grouped[account], 50)
-
-      /* ----------------------------------
-         4. Process Each Batch
-      ---------------------------------- */
 
       for (const batch of batches) {
         const trackingList = batch.join(",")
 
-        console.log("Syncing:", trackingList)
-
-        /* ----------------------------------
-           5. Call PostEx Bulk API
-        ---------------------------------- */
-
         const res = await axios.get(
           "https://api.postex.pk/services/integration/api/order/v1/track-bulk-order",
           {
-            headers: {
-              token,
-            },
-
-            params: {
-              // IMPORTANT: Backend expects this exact name
-              TrackingNumbers: trackingList,
-            },
-
+            headers: { token },
+            params: { TrackingNumbers: trackingList },
             timeout: 30000,
           }
         )
 
-        if (res.data?.statusCode !== "200") {
-          console.log("PostEx API Error:", res.data)
-          continue
-        }
+        if (res.data?.statusCode !== "200") continue
 
         const dist = res.data?.dist || []
 
-        /* ----------------------------------
-           6. Update Supabase Records
-        ---------------------------------- */
-
         for (const item of dist) {
           const t = item.trackingResponse
-
           if (!t?.trackingNumber) continue
 
           const { error: updateError } = await supabaseServer
             .from("manual_orders")
             .update({
               transaction_status: t.transactionStatus,
-
               pickup_date: t.orderPickupDate || null,
               delivery_date: t.orderDeliveryDate || null,
-
               tracking_response: t,
-
               last_synced_at: new Date().toISOString(),
             })
             .eq("tracking_number", t.trackingNumber)
 
-          if (updateError) {
-            console.error("Supabase Update Error:", updateError)
-          }
+          if (!updateError) synced++
         }
       }
     }
 
-    /* ----------------------------------
-       7. Done
-    ---------------------------------- */
-
     return NextResponse.json({
       success: true,
-      message: "Orders synced successfully",
+      message: `Synced ${synced} PostEx manual orders`,
+      synced,
+      skipped: (orders?.length || 0) - eligible.length,
     })
-
-  } catch (err: any) {
-    console.error("Sync Error:", err?.response?.data || err)
-
-    return NextResponse.json(
-      {
-        success: false,
-        error: err?.response?.data || err.message,
-      },
-      { status: 500 }
-    )
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Sync failed"
+    console.error("PostEx manual sync error:", err)
+    return NextResponse.json({ success: false, error: message }, { status: 500 })
   }
 }

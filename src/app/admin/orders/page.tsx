@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { supabaseClient } from "@/utils/supabase/client"
 import LoadingSpinner from "@/components/ui/LoadingSpinner"
 import { Pencil, Trash2, Check, X, Package, Truck, Clock, LogOut, CaseUpper,LocateIcon} from "lucide-react"
-import { AnyARecord } from "dns"  
+import { useCourierProvider } from "@/hooks/useCourierProvider"
 
 interface Order {
   id: string;
@@ -29,6 +29,7 @@ export default function AdminOrdersPage() {
   const [status, setStatus] = useState<string | null>(null)
 
   const router = useRouter()
+  const { provider } = useCourierProvider()
 
   useEffect(() => {
     const isAdmin = localStorage.getItem("isAdmin") === "true"
@@ -114,14 +115,18 @@ const openLocation = (order: any) => {
     }
 
     if (type === "dispatch") {
-      setStatus("Processing PostEx Booking...")
+      setStatus(`Processing ${provider === "nextstep" ? "NextStep" : "PostEx"} booking...`)
       const order = orders.find((o) => o.id === id)
       if (!order) return
 
       try {
-        const totalWeight = order.items?.reduce((sum: number, item: any) => sum + 0.3 * item.quantity, 0) || 0
+        const totalWeight = Math.max(
+          order.items?.reduce((sum: number, item: any) => sum + 0.3 * item.quantity, 0) || 0,
+          0.5
+        )
         const payload = {
-          orderRefNumber: '404',
+          orderId: order.id,
+          orderRefNumber: order.id.slice(0, 8).toUpperCase(),
           invoicePayment: order.total,
           orderDetail: order.items
             ?.map((i: any) => `${i.name} x${i.quantity} | ${i.color.toUpperCase()} `)
@@ -138,7 +143,10 @@ const openLocation = (order: any) => {
           weight: totalWeight,
         }
 
-        const res = await fetch("/api/postex/create", {
+        const bookingEndpoint =
+          provider === "nextstep" ? "/api/nextstep/create" : "/api/postex/create"
+
+        const res = await fetch(bookingEndpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -147,7 +155,7 @@ const openLocation = (order: any) => {
         const data = await res.json()
 
         if (!res.ok || data.statusCode !== "200") {
-          setStatus(`Error: ${data.statusMessage || "PostEx Rejected"}`)
+          setStatus(`Error: ${data.statusMessage || "Courier booking rejected"}`)
           closePopup()
           return
         }
@@ -157,7 +165,26 @@ const openLocation = (order: any) => {
         setOrders((prev) => prev.map((o) => o.id === id ? { ...o, dispatched: true, tracking_number: trackingNumber } : o))
         setFilteredOrders((prev) => prev.map((o) => o.id === id ? { ...o, dispatched: true, tracking_number: trackingNumber } : o))
 
-        await supabaseClient.from("orders").update({ dispatched: true, tracking_number: trackingNumber }).eq("id", id!)
+        const updatePayload: Record<string, unknown> = {
+          dispatched: true,
+          tracking_number: trackingNumber,
+          courier_provider: provider,
+        }
+
+        let { error: updateError } = await supabaseClient
+          .from("orders")
+          .update(updatePayload)
+          .eq("id", id!)
+
+        if (updateError?.message?.includes("courier_provider")) {
+          delete updatePayload.courier_provider
+          ;({ error: updateError } = await supabaseClient
+            .from("orders")
+            .update(updatePayload)
+            .eq("id", id!))
+        }
+
+        if (updateError) throw updateError
         setStatus(`Success! Tracking: ${trackingNumber}`)
       } catch (err: any) {
         setStatus("Booking failed.")
@@ -340,7 +367,7 @@ const openLocation = (order: any) => {
               <p className="text-zinc-500 text-sm mb-8 leading-relaxed">
                 {popup.type === "delete" 
                   ? "Are you sure you want to permanently remove this order from the database? This cannot be undone." 
-                  : "Proceed with PostEx booking? This will generate a tracking number and mark as dispatched."}
+                  : `Proceed with ${provider === "nextstep" ? "NextStep" : "PostEx"} booking? This will generate a tracking number and mark as dispatched.`}
               </p>
               <div className="grid grid-cols-2 gap-3">
                 <Button className="bg-orange-700 hover:bg-orange-800 text-white font-bold" onClick={handleConfirm}>Confirm</Button>

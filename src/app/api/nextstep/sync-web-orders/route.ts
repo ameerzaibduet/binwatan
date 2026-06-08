@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server"
-import axios from "axios"
 import { chunkArray } from "@/lib/courier/chunk"
 import { getSyncCutoffIso, shouldSyncOrder } from "@/lib/courier/sync-filters"
+import { parseNextStepDeliveryDate, trackOrdersStatus } from "@/lib/nextstep/client"
 import { supabaseServer } from "@/utils/supabase/server"
-
-const POSTEX_API_TOKEN = process.env.POSTEX_API_TOKEN!
 
 export async function POST() {
   try {
@@ -19,53 +17,46 @@ export async function POST() {
     if (error) throw error
 
     const eligible = (orders || []).filter((order) => {
-      if (order.courier_provider === "nextstep") return false
+      if (order.courier_provider && order.courier_provider !== "nextstep") return false
       return shouldSyncOrder(order)
     })
 
     if (eligible.length === 0) {
       return NextResponse.json({
         success: true,
-        message: "No PostEx web orders to sync",
+        message: "No NextStep web orders to sync",
         synced: 0,
-        skipped: orders?.length || 0,
       })
     }
 
-    const trackingNumbers = eligible.map((order) => order.tracking_number as string)
-    const batches = chunkArray(trackingNumbers, 50)
+    const batches = chunkArray(
+      eligible.map((order) => order.tracking_number as string),
+      50
+    )
+
     let synced = 0
 
     for (const batch of batches) {
-      const trackingList = batch.join(",")
+      const response = await trackOrdersStatus(batch)
+      const results = response?.result || []
 
-      const res = await axios.get(
-        "https://api.postex.pk/services/integration/api/order/v1/track-bulk-order",
-        {
-          headers: { token: POSTEX_API_TOKEN },
-          params: { TrackingNumbers: trackingList },
-          timeout: 30000,
-        }
-      )
-
-      if (res.data?.statusCode !== "200") continue
-
-      const dist = res.data?.dist || []
-
-      for (const item of dist) {
-        const t = item.trackingResponse
-        if (!t?.trackingNumber) continue
+      for (const item of results) {
+        const timeline = item.timeline || []
+        const latestStatus =
+          timeline[timeline.length - 1]?.status ||
+          timeline[timeline.length - 1]?.name ||
+          null
+        const deliveryDate = parseNextStepDeliveryDate(timeline)
 
         const { error: updateError } = await supabaseServer
           .from("orders")
           .update({
-            transaction_status: t.transactionStatus,
-            pickup_date: t.orderPickupDate || null,
-            delivery_date: t.orderDeliveryDate || null,
-            tracking_response: t,
+            transaction_status: latestStatus,
+            delivery_date: deliveryDate,
+            tracking_response: item,
             last_synced_at: new Date().toISOString(),
           })
-          .eq("tracking_number", t.trackingNumber)
+          .eq("tracking_number", item.tracking_id)
 
         if (!updateError) synced++
       }
@@ -73,13 +64,13 @@ export async function POST() {
 
     return NextResponse.json({
       success: true,
-      message: `Synced ${synced} PostEx web orders`,
+      message: `Synced ${synced} NextStep web orders`,
       synced,
       skipped: (orders?.length || 0) - eligible.length,
     })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Sync failed"
-    console.error("PostEx web sync error:", err)
+    console.error("NextStep web sync error:", err)
     return NextResponse.json({ success: false, error: message }, { status: 500 })
   }
 }

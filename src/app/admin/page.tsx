@@ -10,6 +10,7 @@ import {
 } from "recharts"
 import dayjs from "dayjs"
 import weekOfYear from "dayjs/plugin/weekOfYear"
+import { syncAllWebOrders } from "@/lib/courier/sync-all"
 
 dayjs.extend(weekOfYear)
 
@@ -72,22 +73,21 @@ export default function DashboardPage() {
   /* ================= SYNC API CALL ================= */
 
   const syncWebOrders = async () => {
-    setSyncStatus("Syncing orders...")
+    setSyncStatus("Syncing active web parcels (PostEx + NextStep)...")
 
     try {
-      const res = await fetch("/api/postex/sync-web-orders", { method: "POST" })
-      const data = await res.json()
+      const data = await syncAllWebOrders()
 
       if (data.success) {
-        setSyncStatus("Sync completed!")
+        setSyncStatus(data.message || "Sync completed!")
       } else {
         setSyncStatus("Sync failed!")
       }
-    } catch (err) {
+    } catch {
       setSyncStatus("Error syncing!")
     }
 
-    setTimeout(() => setSyncStatus(null), 4000)
+    setTimeout(() => setSyncStatus(null), 5000)
   }
 
   /* ================= FILTER ================= */
@@ -164,10 +164,10 @@ export default function DashboardPage() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-black">
-            Dashboard Overview
+            Web Orders Dashboard
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Performance insights
+            PostEx + NextStep · sync skips delivered, returned, and orders older than 2 months
           </p>
         </div>
 
@@ -175,7 +175,7 @@ export default function DashboardPage() {
           onClick={syncWebOrders}
           className="bg-orange-400 text-black px-4 py-2 rounded-xl font-semibold shadow-md hover:bg-orange-500"
         >
-          Sync Web Orders
+          Sync Active Parcels
         </button>
       </div>
 

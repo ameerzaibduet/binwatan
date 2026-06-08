@@ -12,6 +12,7 @@ import {
   FaSignOutAlt,
 } from "react-icons/fa"
 import { Button } from "@/components/ui/button"
+import CourierProviderSelector from "@/components/admin/CourierProviderSelector"
 
 const menuItems = [
   { name: "Dashboard", href: "/admin", icon: <FaTachometerAlt /> },
@@ -104,6 +105,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Main Content Area */}
       <main className="flex-1 p-6 md:p-10 lg:p-12 max-w-7xl mx-auto w-full">
+        {pathname !== "/admin-login" && (
+          <div className="mb-8">
+            <CourierProviderSelector />
+          </div>
+        )}
         {children}
       </main>
     </div>

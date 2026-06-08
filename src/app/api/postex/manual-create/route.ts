@@ -45,9 +45,7 @@ export async function POST(req: Request) {
     const trackingNumber = response.data?.dist?.trackingNumber || null
 
     // 💾 Save in Supabase
-    const { error } = await supabaseServer
-      .from("manual_orders")
-      .insert({
+    const insertPayload: Record<string, unknown> = {
         postex_account: body.postexAccount,
         reference_id: body.referenceId,
         order_ref_number: body.orderRefNumber,
@@ -67,7 +65,15 @@ export async function POST(req: Request) {
         tracking_number: trackingNumber,
         dispatched: true,
         raw_response: response.data,
-      })
+        courier_provider: "postex",
+      }
+
+    let { error } = await supabaseServer.from("manual_orders").insert(insertPayload)
+
+    if (error?.message?.includes("courier_provider")) {
+      delete insertPayload.courier_provider
+      ;({ error } = await supabaseServer.from("manual_orders").insert(insertPayload))
+    }
 
     if (error) throw error
 

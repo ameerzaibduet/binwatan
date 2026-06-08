@@ -2,7 +2,7 @@
 
 import Hero from "@/components/Hero"
 import ProductCard from "@/components/ProductCard"
-import { motion, Variants } from "framer-motion"
+import { motion } from "framer-motion"
 import { Products } from "@/lib/products"
 import Image from "next/image"
 import { Minus } from "lucide-react"
@@ -10,19 +10,6 @@ import Link from "next/link"
 
 export default function HomePage() {
   const products = Products
-
-  const containerVariants: Variants = {
-    hidden: { opacity: 0 },
-    visible: { 
-      opacity: 1, 
-      transition: { staggerChildren: 0.1, delayChildren: 0.3 } 
-    },
-  }
-
-  const cardVariants: Variants = {
-    hidden: { opacity: 0, y: 30 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1] } },
-  }
 
   const categories = [
     {
@@ -107,15 +94,14 @@ export default function HomePage() {
           
           <motion.div
             className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-16"
-            variants={containerVariants}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, amount: 0.1 }}
+            initial={{ opacity: 0.6 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
           >
             {products.map((product) => (
-              <motion.div key={product.id} variants={cardVariants}>
+              <div key={product.id}>
                 <ProductCard product={product} />
-              </motion.div>
+              </div>
             ))}
           </motion.div>
         </div>
