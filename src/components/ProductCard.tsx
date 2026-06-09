@@ -42,6 +42,7 @@ export default function ProductCard({ product }: Props) {
   const visibleColors = product.colors.slice(0, 5)
   const extraColorCount = Math.max(product.colors.length - visibleColors.length, 0)
   const isCarCover = Boolean(product.uncoveredImage && product.carDetails)
+  const cardImage = product.cardImage || product.image
 
   return (
     <div
@@ -56,39 +57,14 @@ export default function ProductCard({ product }: Props) {
         }
       >
         {isCarCover ? (
-          <div className="space-y-3 p-3">
-            <div className="relative aspect-[16/10] overflow-hidden rounded-xl bg-slate-200">
-              <Image
-                src={product.image}
-                alt={`${product.name} covered`}
-                fill
-                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
-                sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
-              />
-            </div>
-            <div className="grid grid-cols-[42%_1fr] gap-3">
-              <div className="relative aspect-square overflow-hidden rounded-xl border border-slate-100 bg-white">
-                <Image
-                  src={product.uncoveredImage!}
-                  alt={`${product.carDetails!.carName} without cover`}
-                  fill
-                  className="h-full w-full object-contain p-2"
-                  sizes="160px"
-                />
-              </div>
-              <div className="min-w-0 rounded-xl border border-slate-100 bg-white p-3">
-                <p className="truncate text-sm font-bold text-slate-950">
-                  {product.carDetails!.carName}
-                </p>
-                <p className="mt-1 text-xs font-medium text-slate-600">
-                  {product.carDetails!.fit}
-                </p>
-                <p className="mt-2 text-xs leading-5 text-slate-500">
-                  {product.carDetails!.material}
-                </p>
-              </div>
-            </div>
-          </div>
+          <Image
+            src={cardImage}
+            alt={product.name}
+            width={1200}
+            height={900}
+            className="h-auto w-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+            sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
+          />
         ) : (
           <Image
             src={product.image}
@@ -124,7 +100,7 @@ export default function ProductCard({ product }: Props) {
                 className="h-10 flex-1 rounded-full bg-white text-sm font-semibold text-slate-950 hover:bg-white/90"
               >
                 <ShoppingBag className="size-4" />
-                Cart
+                Add to Cart
               </Button>
               <Button
                 onClick={handleBuyNow}
@@ -181,13 +157,13 @@ export default function ProductCard({ product }: Props) {
           </span>
         </div>
 
-        <div className="mt-5 grid grid-cols-2 gap-2 sm:hidden">
+        <div className={isCarCover ? "mt-5 grid grid-cols-2 gap-2" : "mt-5 grid grid-cols-2 gap-2 sm:hidden"}>
           <Button
             onClick={handleAddToCart}
             className="h-11 w-full rounded-full bg-slate-950 px-3 text-sm font-semibold text-white hover:bg-slate-800"
           >
             <ShoppingBag className="size-4" />
-            Cart
+            Add to Cart
           </Button>
           <Button
             onClick={handleBuyNow}

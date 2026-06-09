@@ -12,7 +12,7 @@ type Props = {
 }
 
 function RelatedProductImage({ product }: { product: Product }) {
-  const image = product.image || product.colors[0]?.image
+  const image = product.cardImage || product.image || product.colors[0]?.image
 
   return (
     <Link

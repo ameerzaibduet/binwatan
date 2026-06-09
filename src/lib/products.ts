@@ -1,4 +1,6 @@
-export const Products = [
+import { Product } from "@/types/product"
+
+export const Products: Product[] = [
   {
     id: "4",
     name: "Parachute Bike Cover",
@@ -235,34 +237,77 @@ export const Products = [
 
   {
     id: "13",
-    name: "Car Top Cover",
-    price: 2599 ,
+    name: "Bolan Top Cover",
+    price: 3250,
     image: "/images/boolan-cover.png",
+    cardImage: "/images/boolan-cover.png",
     uncoveredImage: "/images/bolan.png",
     category: "Car Top Cover",
     carDetails: {
-      carName: "Suzuki Bolan",
+      carName: "Bolan",
       fit: "Top cover fitting",
       material: "Waterproof parachute"
     },
-    description: ` Free delivery
- Open parcel allowed
- 100% waterproof
- 1-year warranty`,
+    description: `Free delivery
+Open parcel allowed
+100% waterproof
+1-year warranty`,
     quantity: 1,
     colors: [
-      { name: "Bolan", image: "/images/boolan-cover.png", default: true },
-      { name: "Bike", image: "/images/bike-cover.png"},
-                  { name: "cultus", image: "/images/cultus-cover.png"},
-      { name: "Mehran", image: "/images/mehran-cover.png"},
-
+      {
+        name: "black",
+        image: "/images/boolan-cover2.png",
+        displayImage: "/images/boolan-cover.png",
+        default: true,
+      },
+      {
+        name: "silver",
+        image: "/images/boolan-silver-cover2.png",
+        displayImage: "/images/boolan-silver-cover.png",
+      },
     ]
   },
-    {
-    id: "14",
+
+  {
+    id: "17",
+    name: "Bolan Top Cover",
+    price: 3250,
+    image: "/images/boolan-silver-cover.png",
+    cardImage: "/images/boolan-silver-cover.png",
+    uncoveredImage: "/images/bolan.png",
+    category: "Car Top Cover",
+    carDetails: {
+      carName: "Bolan",
+      fit: "Top cover fitting",
+      material: "Waterproof parachute"
+    },
+    description: `Free delivery
+Open parcel allowed
+100% waterproof
+1-year warranty`,
+    quantity: 1,
+    colors: [
+      {
+        name: "silver",
+        image: "/images/boolan-silver-cover2.png",
+        displayImage: "/images/boolan-silver-cover.png",
+        default: true,
+      },
+      {
+        name: "black",
+        image: "/images/boolan-cover2.png",
+        displayImage: "/images/boolan-cover.png",
+      },
+    ]
+  },
+
+
+  {
+    id: "18",
     name: "Bike Top Cover",
-    price: 1200 ,
+    price: 1200,
     image: "/images/bike-cover.png",
+    cardImage: "/images/bike-cover.png",
     uncoveredImage: "/images/bike.png",
     category: "Car Top Cover",
     carDetails: {
@@ -270,71 +315,185 @@ export const Products = [
       fit: "Top cover fitting",
       material: "Waterproof parachute"
     },
-    description: ` Free delivery
- Open parcel allowed
- 100% waterproof
- 1-year warranty`,
+    description: `Free delivery
+Open parcel allowed
+100% waterproof
+1-year warranty`,
     quantity: 1,
     colors: [
-      { name: "Bike", image: "/images/bike-cover.png", default: true },
-      { name: "Bolan", image: "/images/boolan-cover.png"},
-            { name: "cultus", image: "/images/cultus-cover.png"},
-      { name: "Mehran", image: "/images/mehran-cover.png"},
+      {
+        name: "black",
+        image: "/images/bike-cover2.png",
+        displayImage: "/images/bike-cover.png",
+        default: true,
+      },
+      {
+        name: "silver",
+        image: "/images/bike-silver-cover.png",
+        displayImage: "/images/bike-silver-cover.png",
+      },
+    ]
+  },
 
-
+  {
+    id: "14",
+    name: "Bike Top Cover",
+    price: 1200,
+    image: "/images/bike-silver-cover.png",
+    cardImage: "/images/bike-silver-cover.png",
+    uncoveredImage: "/images/bike.png",
+    category: "Car Top Cover",
+    carDetails: {
+      carName: "Bike",
+      fit: "Top cover fitting",
+      material: "Waterproof parachute"
+    },
+    description: `Free delivery
+Open parcel allowed
+100% waterproof
+1-year warranty`,
+    quantity: 1,
+    colors: [
+      {
+        name: "silver",
+        image: "/images/bike-silver-cover2.png",
+        displayImage: "/images/bike-silver-cover.png",
+        default: true,
+      },
+      {
+        name: "black",
+        image: "/images/bike-cover2.png",
+        displayImage: "/images/bike-cover.png",
+      },
     ]
   },
 
   {
     id: "15",
     name: "Cultus Top Cover",
-    price: 2599 ,
+    price: 2599,
     image: "/images/cultus-cover.png",
+    cardImage: "/images/cultus-cover.png",
     uncoveredImage: "/images/cultus.png",
     category: "Car Top Cover",
     carDetails: {
-      carName: "Suzuki Cultus",
+      carName: "Cultus",
       fit: "Top cover fitting",
       material: "Waterproof parachute"
     },
-    description: ` Free delivery
- Open parcel allowed
- 100% waterproof
- 1-year warranty`,
+    description: `Free delivery
+Open parcel allowed
+100% waterproof
+1-year warranty`,
     quantity: 1,
     colors: [
-      { name: "cultus", image: "/images/cultus-cover.png", default: true },
-      { name: "Bolan", image: "/images/boolan-cover.png"},
-      { name: "Bike", image: "/images/bike-cover.png"},
-      { name: "Mehran", image: "/images/mehran-cover.png"},
-
-
+      {
+        name: "black",
+        image: "/images/cultus-cover2.png",
+        displayImage: "/images/cultus-cover.png",
+        default: true,
+      },
+      {
+        name: "silver",
+        image: "/images/cultus-silver-cover2.jpg",
+        displayImage: "/images/cultus-silver-cover.png",
+      },
+    ]
+  },
+  {
+    id: "19",
+    name: "Cultus Top Cover",
+    price: 2599,
+    image: "/images/cultus-silver-cover.png",
+    cardImage: "/images/cultus-silver-cover.png",
+    uncoveredImage: "/images/cultus.png",
+    category: "Car Top Cover",
+    carDetails: {
+      carName: "Cultus",
+      fit: "Top cover fitting",
+      material: "Waterproof parachute"
+    },
+    description: `Free delivery
+Open parcel allowed
+100% waterproof
+1-year warranty`,
+    quantity: 1,
+    colors: [
+      {
+        name: "silver",
+        image: "/images/cultus-silver-cover2.jpg",
+        displayImage: "/images/cultus-silver-cover.png",
+        default: true,
+      },
+      {
+        name: "black",
+        image: "/images/cultus-cover2.png",
+        displayImage: "/images/cultus-cover.png",
+      },
     ]
   },
   {
     id: "16",
     name: "Mehran Top Cover",
-    price: 2599 ,
+    price: 2599,
     image: "/images/mehran-cover.png",
+    cardImage: "/images/mehran-cover.png",
     uncoveredImage: "/images/mehran.png",
     category: "Car Top Cover",
     carDetails: {
-      carName: "Suzuki Mehran",
+      carName: "Mehran",
       fit: "Top cover fitting",
       material: "Waterproof parachute"
     },
-    description: ` Free delivery
- Open parcel allowed
- 100% waterproof
- 1-year warranty`,
+    description: `Free delivery
+Open parcel allowed
+100% waterproof
+1-year warranty`,
     quantity: 1,
     colors: [
-      { name: "Mehran", image: "/images/mehran-cover.png", default: true },
-      { name: "Bolan", image: "/images/boolan-cover.png"},
-      { name: "Bike", image: "/images/bike-cover.png"},
-      { name: "cultus", image: "/images/cultus-cover.png"},
-      
-
+      {
+        name: "black",
+        image: "/images/mehran-cover2.png",
+        displayImage: "/images/mehran-cover.png",
+        default: true,
+      },
+      {
+        name: "silver",
+        image: "/images/mehran-silver-cover.png",
+        displayImage: "/images/mehran-silver-cover.png",
+      },
+    ]
+  },
+  {
+    id: "20",
+    name: "Mehran Top Cover",
+    price: 2599,
+    image: "/images/mehran-silver-cover.png",
+    cardImage: "/images/mehran-silver-cover.png",
+    uncoveredImage: "/images/mehran.png",
+    category: "Car Top Cover",
+    carDetails: {
+      carName: "Mehran",
+      fit: "Top cover fitting",
+      material: "Waterproof parachute"
+    },
+    description: `Free delivery
+Open parcel allowed
+100% waterproof
+1-year warranty`,
+    quantity: 1,
+    colors: [
+      {
+        name: "silver",
+        image: "/images/mehran-silver-cover.png",
+        displayImage: "/images/mehran-silver-cover.png",
+        default: true,
+      },
+      {
+        name: "black",
+        image: "/images/mehran-cover2.png",
+        displayImage: "/images/mehran-cover.png",
+      },
     ]
   },
 

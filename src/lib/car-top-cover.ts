@@ -16,15 +16,22 @@ export function isCarTopCoverProduct(product: Product) {
 
 export function getCarTopCoverTypes(): CarTypeOption[] {
   return Products.filter((p) => isCarTopCoverProduct(p)).map((p) => {
-    const primary = p.colors.find((c) => c.default) || p.colors[0]
+    const blackCover = p.colors.find((c) => c.name === "black") || p.colors[0]
     return {
-      name: primary?.name ?? p.name,
-      coverImage: p.image,
-      thumbnailImage: primary?.image ?? p.image,
+      name: p.carDetails?.carName ?? p.name.replace(" Top Cover", ""),
+      coverImage: blackCover?.displayImage ?? blackCover?.image ?? p.image,
+      thumbnailImage: blackCover?.image ?? p.image,
       uncoveredImage: p.uncoveredImage,
       productId: p.id,
       price: p.price,
     }
+  })
+}
+
+export function cartContainsTopCover(cart: { id: string }[]) {
+  return cart.some((item) => {
+    const product = Products.find((p) => p.id === item.id)
+    return product && isCarTopCoverProduct(product)
   })
 }
 

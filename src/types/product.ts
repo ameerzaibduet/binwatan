@@ -3,6 +3,7 @@ export type Product = {
   name: string
   price: number
   image: string
+  cardImage?: string
   uncoveredImage?: string
   category: string
   carDetails?: {
@@ -15,6 +16,7 @@ export type Product = {
   colors: {
     name: string
     image: string
+    displayImage?: string
     default?: boolean // ✅ Add this line to fix the error
   }[]
   color?: string

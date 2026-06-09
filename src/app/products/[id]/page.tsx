@@ -3,36 +3,51 @@
 import { use, useState, useEffect } from "react"
 import { notFound, useRouter } from "next/navigation"
 import Image from "next/image"
+import Link from "next/link"
 import { Products } from "@/lib/products"
-import {
-  getCarTopCoverTypes,
-  getCarTypeForProduct,
-  getProductForCarType,
-  isCarTopCoverProduct,
-  type CarTypeOption,
-} from "@/lib/car-top-cover"
+import { isCarTopCoverProduct } from "@/lib/car-top-cover"
 import { formatPrice } from "@/lib/format-price"
-import { colorMap } from "@/lib/color-map"
 import ProductCategoryRow from "@/components/ProductCategoryRow"
+import ProductColorPicker from "@/components/ProductColorPicker"
 import { groupRelatedProductsByCategory } from "@/lib/group-products-by-category"
 import { Button } from "@/components/ui/button"
 import { useCart } from "@/lib/use-cart"
 import { useCartUI } from "@/lib/use-cart-ui"
 import clsx from "clsx"
 import { motion, AnimatePresence } from "framer-motion"
-import { Check, Minus, ShieldCheck, Truck } from "lucide-react"
+import { ArrowLeft, Check, Minus, ShoppingBag } from "lucide-react"
 
 type Props = {
   params: Promise<{ id: string }>
 }
 
 const ttqTrack = (eventName: string, params: Record<string, unknown> = {}) => {
-  if (typeof window !== "undefined" && (window as unknown as { ttq?: { track: (e: string, p: Record<string, unknown>) => void } }).ttq) {
-    ;(window as unknown as { ttq: { track: (e: string, p: Record<string, unknown>) => void } }).ttq.track(eventName, params)
+  if (
+    typeof window !== "undefined" &&
+    (window as unknown as { ttq?: { track: (e: string, p: Record<string, unknown>) => void } }).ttq
+  ) {
+    ;(window as unknown as { ttq: { track: (e: string, p: Record<string, unknown>) => void } }).ttq.track(
+      eventName,
+      params
+    )
   }
 }
 
 const bikeTypes = ["70cc", "110cc", "125cc", "150cc"]
+
+function getCompactBenefits(description: string) {
+  const seen = new Set<string>()
+  return description
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter((line) => {
+      const key = line.toLowerCase()
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+}
 
 export default function ProductDetailPage({ params }: Props) {
   const { id } = use(params)
@@ -42,57 +57,56 @@ export default function ProductDetailPage({ params }: Props) {
   const { openCart, closeCart } = useCartUI()
 
   const isCarTopCover = product ? isCarTopCoverProduct(product) : false
-  const carTypeOptions = isCarTopCover ? getCarTopCoverTypes() : []
 
   const [selectedColor, setSelectedColor] = useState(
     product?.colors?.find((c) => c.default) || product?.colors?.[0]
   )
-  const [selectedCarType, setSelectedCarType] = useState<CarTypeOption | null>(() => {
-    if (!product || !isCarTopCoverProduct(product)) return null
-    return getCarTypeForProduct(product) ?? getCarTopCoverTypes()[0] ?? null
-  })
+  const [selectedCoverColor, setSelectedCoverColor] = useState(
+    product?.colors?.find((c) => c.default)?.name || product?.colors?.[0]?.name || "black"
+  )
   const [selectedCC, setSelectedCC] = useState("70cc")
 
   if (!product) return notFound()
 
+  const activeCoverColor =
+    product.colors.find((c) => c.name === selectedCoverColor) ||
+    product.colors.find((c) => c.default) ||
+    product.colors[0]
+
   const mainImage = isCarTopCover
-    ? selectedCarType?.coverImage || product.image
+    ? activeCoverColor?.displayImage || activeCoverColor?.image || product.image
     : selectedColor?.image || product.image
 
   const selectionLabel = isCarTopCover
-    ? selectedCarType?.name
+    ? activeCoverColor?.name ?? selectedCoverColor
     : selectedColor?.name
 
-  const activeProduct =
-    isCarTopCover && selectedCarType
-      ? getProductForCarType(selectedCarType.productId) ?? product
-      : product
-
-  const displayPrice =
-    isCarTopCover && selectedCarType ? selectedCarType.price : product.price
+  const benefits = getCompactBenefits(product.description)
 
   useEffect(() => {
     ttqTrack("ViewContent", {
-      content_id: activeProduct.id,
+      content_id: product.id,
       content_type: "product",
-      content_name: activeProduct.name,
-      price: displayPrice,
+      content_name: product.name,
+      price: product.price,
       currency: "PKR",
     })
-  }, [activeProduct, displayPrice])
+  }, [product])
 
   const handleAddToCart = () => {
     addToCart({
-      ...activeProduct,
+      id: product.id,
+      name: product.name,
+      price: product.price,
       image: mainImage,
       quantity: 1,
       color: selectionLabel,
     })
     ttqTrack("AddToCart", {
-      content_id: activeProduct.id,
+      content_id: product.id,
       content_type: "product",
       quantity: 1,
-      price: displayPrice,
+      price: product.price,
       currency: "PKR",
     })
     openCart()
@@ -100,15 +114,17 @@ export default function ProductDetailPage({ params }: Props) {
 
   const handleBuyNow = () => {
     addToCart({
-      ...activeProduct,
+      id: product.id,
+      name: product.name,
+      price: product.price,
       image: mainImage,
       quantity: 1,
       color: selectionLabel,
     })
     ttqTrack("InitiateCheckout", {
-      content_id: activeProduct.id,
+      content_id: product.id,
       content_type: "product",
-      value: displayPrice,
+      value: product.price,
       currency: "PKR",
     })
     closeCart()
@@ -118,168 +134,127 @@ export default function ProductDetailPage({ params }: Props) {
   const relatedProductGroups = groupRelatedProductsByCategory(Products, product)
 
   return (
-    <main className="min-h-screen bg-[#fbfbfa] text-slate-950">
-      <div className="mx-auto max-w-7xl px-6 py-10 sm:py-14">
-        <div className="grid grid-cols-1 items-start gap-12 lg:grid-cols-2 lg:gap-16">
-          <div className="lg:sticky lg:top-24">
-            <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-[0_8px_30px_rgba(15,23,42,0.04)]">
-              <div className="relative w-full overflow-hidden bg-[#f4f4f2]">
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={mainImage}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-                  >
-                    <Image
-                      src={mainImage}
-                      alt={isCarTopCover ? `${selectedCarType?.name} cover` : product.name}
-                      width={1200}
-                      height={900}
-                      className="block h-auto w-full object-cover"
-                      sizes="(min-width: 1024px) 45vw, 100vw"
-                      priority
-                    />
-                  </motion.div>
-                </AnimatePresence>
+    <main className="min-h-screen bg-gradient-to-b from-[#fafaf9] to-white text-slate-950">
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-10">
+        <Link
+          href="/products"
+          className="mb-5 inline-flex items-center gap-2 text-sm font-medium text-slate-500 transition-colors hover:text-orange-600"
+        >
+          <ArrowLeft className="size-4" />
+          Back to products
+        </Link>
 
-                {isCarTopCover && selectedCarType && (
-                  <div className="absolute left-4 top-4 rounded-full bg-white/95 px-4 py-2 text-sm font-bold text-slate-950 shadow-sm backdrop-blur">
-                    {selectedCarType.name}
-                  </div>
-                )}
-              </div>
+        <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-2 lg:gap-12">
+          <div className="lg:sticky lg:top-20">
+            <div className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={mainImage}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.25 }}
+                  className="w-full bg-[#f4f4f2]"
+                >
+                  <Image
+                    src={mainImage}
+                    alt={product.name}
+                    width={1200}
+                    height={900}
+                    className="h-auto w-full object-contain"
+                    sizes="(min-width: 1024px) 50vw, 100vw"
+                    priority
+                  />
+                </motion.div>
+              </AnimatePresence>
 
-              <div className="border-t border-slate-100 p-4 sm:p-5">
-                <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
-                  {isCarTopCover ? "Select car type" : "Select color"}
-                </p>
-
-                {isCarTopCover ? (
-                  <div className="flex gap-4 overflow-x-auto pb-1 category-scroll">
-                    {carTypeOptions.map((carType) => {
-                      const isSelected = selectedCarType?.productId === carType.productId
-                      return (
-                        <button
-                          key={carType.productId}
-                          type="button"
-                          onClick={() => setSelectedCarType(carType)}
-                          className={clsx(
-                            "flex w-24 shrink-0 flex-col items-center gap-2 rounded-xl p-2 transition-all sm:w-28",
-                            isSelected
-                              ? "bg-orange-50 ring-2 ring-orange-400"
-                              : "hover:bg-slate-50"
-                          )}
-                        >
-                          <div className="relative aspect-[4/3] w-full overflow-hidden rounded-lg border border-slate-100">
-                            <Image
-                              src={carType.thumbnailImage}
-                              alt={carType.name}
-                              fill
-                              className="object-cover"
-                              sizes="112px"
-                            />
-                          </div>
-                          <span className="text-center text-xs font-semibold capitalize text-slate-800">
-                            {carType.name}
-                          </span>
-                          <span className="text-center text-[11px] font-bold text-orange-500">
-                            {formatPrice(carType.price)}
-                          </span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                ) : (
-                  <div className="flex gap-3 overflow-x-auto pb-1 category-scroll">
-                    {product.colors.map((color) => {
-                      const isSelected = selectedColor?.name === color.name
-                      return (
-                        <button
-                          key={color.name}
-                          type="button"
-                          onClick={() => setSelectedColor(color)}
-                          className={clsx(
-                            "group/color flex shrink-0 flex-col items-center gap-2 rounded-xl p-1.5 transition-all",
-                            isSelected
-                              ? "bg-orange-50 ring-2 ring-orange-400"
-                              : "hover:bg-slate-50"
-                          )}
-                        >
-                          <div className="relative size-16 overflow-hidden rounded-lg border border-slate-100 sm:size-20">
-                            <Image
-                              src={color.image}
-                              alt={color.name}
-                              fill
-                              className="object-cover"
-                              sizes="80px"
-                            />
-                          </div>
-                          <span
-                            className="size-4 rounded-full border-2 border-white shadow ring-1 ring-slate-200"
-                            style={{ backgroundColor: colorMap[color.name] || "#e5e7eb" }}
-                          />
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
+              {!isCarTopCover && (
+                <div className="border-t border-slate-100 p-4 sm:p-5">
+                  <ProductColorPicker
+                    label="Color"
+                    colors={product.colors}
+                    selected={selectedColor?.name ?? ""}
+                    onSelect={(name) => {
+                      const color = product.colors.find((c) => c.name === name)
+                      if (color) setSelectedColor(color)
+                    }}
+                  />
+                </div>
+              )}
             </div>
           </div>
 
           <div className="flex flex-col">
-            <p className="text-xs font-bold uppercase tracking-[0.3em] text-orange-500">
+            <p className="text-xs font-bold uppercase tracking-wider text-orange-500">
               {product.category}
             </p>
-            <h1 className="mt-3 font-serif text-4xl tracking-tight text-slate-950 sm:text-5xl">
-              {isCarTopCover && selectedCarType
-                ? `${selectedCarType.name} Top Cover`
-                : product.name}
+
+            <h1 className="mt-2 font-serif text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
+              {product.name}
             </h1>
 
-            <p className="mt-5 text-3xl font-bold tabular-nums text-orange-500">
-              {formatPrice(displayPrice)}
-            </p>
-
-            <div className="mt-6 flex flex-wrap gap-3">
-              {[
-                { icon: Truck, label: "Free delivery" },
-                { icon: ShieldCheck, label: "Waterproof build" },
-              ].map((item) => (
-                <span
-                  key={item.label}
-                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700"
-                >
-                  <item.icon className="size-4 text-orange-400" />
-                  {item.label}
-                </span>
-              ))}
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <p className="text-3xl font-black tabular-nums text-orange-500 sm:text-4xl">
+                {formatPrice(product.price)}
+              </p>
+              <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
+                Free delivery
+              </span>
             </div>
 
-            <ul className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {product.description.split("\n").map((line, i) => (
-                <li key={i} className="flex items-start gap-2.5 text-sm text-slate-600">
-                  <Check className="mt-0.5 size-4 shrink-0 text-orange-500" />
-                  <span>{line.trim()}</span>
+            {isCarTopCover && (
+              <div className="mt-4">
+                <ProductColorPicker
+                  label="Cover color"
+                  colors={product.colors}
+                  selected={selectedCoverColor}
+                  onSelect={setSelectedCoverColor}
+                />
+              </div>
+            )}
+
+            <div className="mt-5 flex flex-col gap-2.5 sm:flex-row">
+              <Button
+                onClick={handleBuyNow}
+                className="h-14 flex-1 rounded-2xl bg-orange-500 text-base font-bold text-white shadow-lg shadow-orange-500/30 hover:bg-orange-600 sm:order-2"
+              >
+                Buy Now
+              </Button>
+              <Button
+                onClick={handleAddToCart}
+                variant="outline"
+                className="h-14 flex-1 rounded-2xl border-2 border-slate-900 text-base font-bold text-slate-900 hover:bg-slate-50 sm:order-1"
+              >
+                <ShoppingBag className="mr-2 size-5" />
+                Add to Cart
+              </Button>
+            </div>
+
+            <ul className="mt-5 flex flex-wrap gap-2">
+              {benefits.map((line, i) => (
+                <li
+                  key={i}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600"
+                >
+                  <Check className="size-3.5 shrink-0 text-orange-500" />
+                  {line}
                 </li>
               ))}
             </ul>
 
             {!isCarTopCover && (
-              <div className="mt-8 border-t border-slate-100 pt-8">
-                <p className="text-sm font-semibold text-slate-950">Bike type</p>
-                <div className="mt-3 flex flex-wrap gap-2">
+              <div className="mt-5">
+                <p className="text-sm font-semibold text-slate-900">Bike engine size</p>
+                <div className="mt-2 flex flex-wrap gap-2">
                   {bikeTypes.map((cc) => (
                     <button
                       key={cc}
                       type="button"
                       onClick={() => setSelectedCC(cc)}
                       className={clsx(
-                        "rounded-full border px-5 py-2 text-sm font-medium transition-all duration-200",
+                        "rounded-full border px-4 py-2 text-sm font-medium transition-all",
                         selectedCC === cc
-                          ? "border-slate-950 bg-slate-950 text-white"
+                          ? "border-slate-900 bg-slate-900 text-white"
                           : "border-slate-200 bg-white text-slate-700 hover:border-orange-300"
                       )}
                     >
@@ -289,51 +264,12 @@ export default function ProductDetailPage({ params }: Props) {
                 </div>
               </div>
             )}
-
-            <div className="mt-6 rounded-xl border border-slate-100 bg-white p-4 text-sm text-slate-600">
-              {isCarTopCover ? (
-                <p>
-                  Car type:{" "}
-                  <span className="font-semibold capitalize text-slate-950">
-                    {selectedCarType?.name}
-                  </span>
-                </p>
-              ) : (
-                <>
-                  <p>
-                    Color:{" "}
-                    <span className="font-semibold capitalize text-slate-950">
-                      {selectedColor?.name}
-                    </span>
-                  </p>
-                  <p className="mt-1">
-                    Bike type:{" "}
-                    <span className="font-semibold text-slate-950">{selectedCC}</span>
-                  </p>
-                </>
-              )}
-            </div>
-
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Button
-                onClick={handleAddToCart}
-                className="h-12 flex-1 rounded-full bg-slate-950 text-base font-semibold text-white hover:bg-slate-800"
-              >
-                Add to Cart
-              </Button>
-              <Button
-                onClick={handleBuyNow}
-                className="h-12 flex-1 rounded-full bg-orange-500 text-base font-semibold text-white hover:bg-orange-600"
-              >
-                Buy Now
-              </Button>
-            </div>
           </div>
         </div>
 
         {relatedProductGroups.length > 0 && (
-          <section className="mt-20 border-t border-slate-200/80 pt-16">
-            <div className="mb-12 flex flex-col items-center text-center">
+          <section className="mt-16 border-t border-slate-200/80 pt-14 sm:mt-20">
+            <div className="mb-10 flex flex-col items-center text-center">
               <div className="flex items-center gap-2">
                 <Minus className="w-8 text-orange-400" />
                 <span className="text-xs font-bold uppercase tracking-[0.3em] text-orange-400">

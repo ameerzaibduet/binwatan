@@ -40,7 +40,7 @@ export default function CategoryPage() {
       "Explore carefully selected products with practical protection, reliable delivery, and clear color choices.",
   }
   const heroProducts = filteredProducts.slice(0, 3)
-  const heroImage = heroProducts[0]?.image || "/newarrival.png"
+  const heroImage = heroProducts[0]?.cardImage || heroProducts[0]?.image || "/newarrival.png"
 
   return (
     <main className="min-h-screen bg-[#fbfbfa] pb-20 text-slate-950">
@@ -102,7 +102,7 @@ export default function CategoryPage() {
                     className="relative aspect-square overflow-hidden rounded-lg border border-slate-200 bg-[#f7f7f4]"
                   >
                     <Image
-                      src={product.image}
+                      src={product.cardImage || product.image}
                       alt={product.name}
                       fill
                       sizes="(min-width: 1024px) 20vw, 50vw"
