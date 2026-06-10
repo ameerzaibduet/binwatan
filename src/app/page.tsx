@@ -9,7 +9,10 @@ import { Minus } from "lucide-react"
 import Link from "next/link"
 
 export default function HomePage() {
-  const products = Products
+  const featuredProductIds = ["15", "13", "18", "4", "9", "19", "16", "2"]
+  const products = featuredProductIds
+    .map((id) => Products.find((product) => product.id === id))
+    .filter((product): product is (typeof Products)[number] => Boolean(product))
 
   const categories = [
     {
@@ -37,29 +40,26 @@ export default function HomePage() {
      
 
       {/* 2. Featured Categories */}
-      <section className="mx-auto max-w-7xl px-6 py-16">
-        <div className="mb-10 flex flex-col items-center text-center">
-          <div className="mb-4 flex items-center gap-2">
-            <Minus className="w-8 text-orange-400" />
-            <span className="text-xs font-bold uppercase tracking-[0.3em] text-orange-400">
-              Categories
+      <section className="mx-auto max-w-7xl px-6 py-10">
+        <div className="mb-7 flex flex-col items-center text-center">
+          <div className="mb-2 flex items-center gap-2">
+            <Minus className="w-5 text-orange-400" />
+            <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-orange-400">
+              Category
             </span>
-            <Minus className="w-8 text-orange-400" />
+            <Minus className="w-5 text-orange-400" />
           </div>
-          <h2 className="font-serif text-4xl tracking-tight text-slate-950 md:text-5xl">
-            Shop by Category
-          </h2>
         </div>
 
         <div className="category-scroll overflow-x-auto pb-2">
-          <div className="mx-auto flex min-w-max snap-x snap-mandatory gap-4 pr-12 md:min-w-0 md:max-w-3xl md:justify-center md:gap-8 md:pr-0">
+          <div className="mx-auto flex min-w-max snap-x snap-mandatory gap-4 pr-12 md:min-w-0 md:max-w-2xl md:justify-center md:gap-6 md:pr-0">
             {categories.map((cat) => (
               <Link
                 key={cat.name}
                 href={cat.href}
-                className="group flex w-[35vw] min-w-28 max-w-40 shrink-0 snap-start flex-col items-center text-center md:w-48 md:max-w-48"
+                className="group flex w-[28vw] min-w-24 max-w-32 shrink-0 snap-start flex-col items-center text-center md:w-36 md:max-w-36"
               >
-                <div className="relative aspect-square w-full overflow-hidden rounded-full border border-slate-200 bg-slate-100 shadow-[0_16px_45px_rgba(15,23,42,0.08)] transition-all duration-300 group-hover:-translate-y-1 group-hover:border-orange-300 group-hover:shadow-[0_24px_60px_rgba(15,23,42,0.14)]">
+                <div className="relative aspect-square w-full overflow-hidden rounded-lg border border-slate-200 bg-slate-100 shadow-[0_16px_45px_rgba(15,23,42,0.08)] transition-all duration-300 group-hover:-translate-y-1 group-hover:border-orange-300 group-hover:shadow-[0_24px_60px_rgba(15,23,42,0.14)]">
                   <Image
                     src={cat.image}
                     alt={cat.name}
@@ -68,7 +68,7 @@ export default function HomePage() {
                     className="object-cover transition-transform duration-500 group-hover:scale-105"
                   />
                 </div>
-                <span className="mt-4 text-base font-semibold text-slate-950 transition-colors group-hover:text-orange-500">
+                <span className="mt-3 text-sm font-semibold text-slate-950 transition-colors group-hover:text-orange-500">
                   {cat.name}
                 </span>
               </Link>
@@ -78,22 +78,21 @@ export default function HomePage() {
       </section>
 
       {/* 3. Top Products - Systematic Grid Spacing */}
-      <section className="bg-white py-20 border-y border-slate-100">
+      <section className="bg-white py-6 border-y border-slate-100">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="flex flex-col items-center text-center mb-16">
-            <div className="flex flex-col items-center text-center mb-16">
-              <div className="flex items-center gap-2 mb-4">
-                <Minus className="text-orange-400 w-8" />
-                <span className="text-orange-400 text-xs font-bold uppercase tracking-[0.3em]">Our Essentials</span>
-                <Minus className="text-orange-400 w-8" />
+          <div className="flex flex-col items-center text-center mb-10">
+            <div className="flex flex-col items-center text-center">
+              <div className="flex items-center gap-2 mb-2">
+                <Minus className="text-orange-400 w-5" />
+                <span className="text-orange-400 text-[10px] font-bold uppercase tracking-[0.22em]">Our Essentials</span>
+                <Minus className="text-orange-400 w-5" />
               </div>
-              <h2 className="text-4xl md:text-5xl font-serif tracking-tight text-slate-900">Most Desired Pieces</h2>
             </div>
       
           </div>
           
           <motion.div
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-16"
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-10"
             initial={{ opacity: 0.6 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.3, ease: "easeOut" }}

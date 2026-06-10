@@ -497,5 +497,69 @@ Open parcel allowed
     ]
   },
 
+  {
+    id: "21",
+    name: "Corolla Top Cover",
+    price: 2599,
+    image: "/images/corolla-silver-cover.png",
+    cardImage: "/images/corolla-silver-cover.png",
+    uncoveredImage: "/images/corolla.png",
+    category: "Car Top Cover",
+    carDetails: {
+      carName: "Mehran",
+      fit: "Top cover fitting",
+      material: "Waterproof parachute"
+    },
+    description: `Free delivery
+Open parcel allowed
+100% waterproof
+1-year warranty`,
+    quantity: 1,
+    colors: [
+      {
+        name: "silver",
+        image: "/images/corolla-silver-cover.png",
+        displayImage: "/images/corolla-silver-cover.png",
+        default: true,
+      },
+      {
+        name: "black",
+        image: "/images/corolla-cover2.png",
+        displayImage: "/images/corolla-cover.png",
+      },
+    ]
+  },
 
+   {
+    id: "22",
+    name: "Corolla Top Cover",
+    price: 2599,
+    image: "/images/corolla-cover.png",
+    cardImage: "/images/corolla-cover.png",
+    uncoveredImage: "/images/corolla.png",
+    category: "Car Top Cover",
+    carDetails: {
+      carName: "Mehran",
+      fit: "Top cover fitting",
+      material: "Waterproof parachute"
+    },
+    description: `Free delivery
+Open parcel allowed
+100% waterproof
+1-year warranty`,
+    quantity: 1,
+    colors: [
+      {
+        name: "silver",
+        image: "/images/corolla-cover.png",
+        displayImage: "/images/corolla-cover.png",
+        default: true,
+      },
+      {
+        name: "black",
+        image: "/images/corolla-silver-cover2.png",
+        displayImage: "/images/corolla-silver-cover.png",
+      },
+    ]
+  },
 ]
