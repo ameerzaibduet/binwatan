@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { supabaseClient } from "@/utils/supabase/client"
 import LoadingSpinner from "@/components/ui/LoadingSpinner"
-import { Pencil, Trash2, Check, X, Package, Truck, Clock, LogOut, CaseUpper,LocateIcon} from "lucide-react"
+import { Pencil, Trash2, Check, X, Package, Truck, Clock, LogOut, CaseUpper, LocateIcon, MessageCircle } from "lucide-react"
 import { useCourierProvider } from "@/hooks/useCourierProvider"
 
 interface Order {
@@ -48,6 +48,55 @@ const openLocation = (order: any) => {
 
   const url = `https://www.google.com/maps?q=${order.latitude},${order.longitude}`
   window.open(url, "_blank")
+}
+
+const formatWhatsappPhone = (phone: string) => {
+  const digits = String(phone || "").replace(/\D/g, "")
+  if (!digits) return ""
+  if (digits.startsWith("92")) return digits
+  if (digits.startsWith("0")) return `92${digits.slice(1)}`
+  return digits
+}
+
+const getWhatsappOrderDetails = (order: any) => {
+  const products =
+    order.items
+      ?.map((item: any) => {
+        const quantity = item.quantity && item.quantity > 1 ? ` x${item.quantity}` : ""
+        const color = item.color ? ` ${String(item.color).toUpperCase()}` : ""
+        return `${item.name}${quantity}${color}`
+      })
+      .join(", ") || "aap ka product"
+
+  return order.bike_specifications
+    ? `${products} ${order.bike_specifications}`
+    : products
+}
+
+const openWhatsappMessage = (order: any) => {
+  const phone = formatWhatsappPhone(order.phone)
+  if (!phone) {
+    alert("Customer phone number not found")
+    return
+  }
+
+  const customerName = order.name || "customer"
+  const productDetails = getWhatsappOrderDetails(order)
+  const price = order.total || order.items?.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0) || ""
+  const message = `Assalam o Alaikum ${customerName},
+
+*Order Confirmation*
+
+Aap ne *${productDetails}* order kiya hai.
+Qeemat: *Rs. ${price}*
+
+Barah-e-karam apna address confirm kar dein ya apni location bhej dein, taake delivery mein asani ho.
+
+*Note:* Aap parcel khol kar check kar sakte hain.
+
+Shukriya.`
+
+  window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank")
 }
   const fetchOrders = async () => {
   setStatus("Syncing with database...")
@@ -298,13 +347,22 @@ const openLocation = (order: any) => {
                       : <span className="text-black leading-snug">{order.address}, <span className="text-orange-700">{order.city}</span></span>
                     }
                   </div>
-                  <Button
-  className="mt-2 bg-green-600"
-  onClick={() => openLocation(order)}
-> Location
-<LocateIcon className="w-4 h-4 mr-2" />
-
-</Button>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <Button
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                      onClick={() => openLocation(order)}
+                    >
+                      <LocateIcon className="w-4 h-4 mr-2" />
+                      Location
+                    </Button>
+                    <Button
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                      onClick={() => openWhatsappMessage(order)}
+                    >
+                      <MessageCircle className="w-4 h-4 mr-2" />
+                      WhatsApp
+                    </Button>
+                  </div>
                     
                 </div>
 
