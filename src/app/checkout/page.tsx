@@ -23,9 +23,11 @@ import { ChevronsUpDown, MapPin, ShoppingBag } from "lucide-react"
 import { CITIES } from "@/lib/cities"
 import { cartContainsTopCover } from "@/lib/car-top-cover"
 import { formatPrice } from "@/lib/format-price"
+import { useCustomerOrders } from "@/lib/use-customer-orders"
 
 export default function CheckoutPage() {
   const { cart, clearCart } = useCart()
+  const { addOrder, setPhone } = useCustomerOrders()
   const router = useRouter()
 
   const [hydrated, setHydrated] = useState(false)
@@ -129,18 +131,39 @@ export default function CheckoutPage() {
         price: item.price,
         quantity: item.quantity,
         color: item.color ?? null,
+        image: item.image,
       })),
       total,
       dispatched: false,
     }
 
-    const { error } = await supabase.from("orders").insert([order])
+    const { data, error } = await supabase.from("orders").insert([order]).select().single()
 
-    if (error) {
+    if (error || !data) {
       setErrorMsg("Order failed. Try again.")
       setLoading(false)
       return
     }
+
+    const savedOrder = {
+      id: data.id,
+      name: data.name,
+      phone: data.phone,
+      city: data.city,
+      address: data.address,
+      total: data.total,
+      items: data.items,
+      bike_specifications: data.bike_specifications,
+      created_at: data.created_at,
+      dispatched: data.dispatched,
+      transaction_status: data.transaction_status ?? null,
+      delivery_date: data.delivery_date ?? null,
+      tracking_number: data.tracking_number ?? null,
+    }
+
+    addOrder(savedOrder)
+    setPhone(data.phone)
+    sessionStorage.setItem("lastPlacedOrder", JSON.stringify(savedOrder))
 
     clearCart()
     router.push("/order-success")

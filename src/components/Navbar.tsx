@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation"
 import { useCart } from "@/lib/use-cart"
 import { useCartUI } from "@/lib/use-cart-ui"
 import { useState } from "react"
-import { ShoppingCart, Menu, ChevronDown, X, Home } from "lucide-react"
+import { ShoppingCart, Menu, ChevronDown, X, Home, Package } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { motion, AnimatePresence } from "framer-motion"
 import CartDrawer from "./CartDrawer"
@@ -86,6 +86,13 @@ export default function Navbar() {
               )}
             </AnimatePresence>
           </div>
+
+          <Link
+            href="/orders"
+            className="flex items-center gap-1 text-white bg-transparent hover:text-[#F97316] transition-colors text-sm font-medium"
+          >
+            <Package size={16} /> My Orders
+          </Link>
 
           {/* Cart */}
           <Button
@@ -178,6 +185,14 @@ export default function Navbar() {
                       {cat}
                     </Link>
                   ))}
+
+                  <Link
+                    href="/orders"
+                    onClick={() => setMobileOpen(false)}
+                    className="flex items-center gap-2 text-white text-base font-medium px-2 py-2 rounded hover:text-[#F97316] transition-colors"
+                  >
+                    <Package size={16} /> My Orders
+                  </Link>
                 </div>
               </motion.div>
             </>

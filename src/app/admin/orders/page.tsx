@@ -7,6 +7,7 @@ import { supabaseClient } from "@/utils/supabase/client"
 import LoadingSpinner from "@/components/ui/LoadingSpinner"
 import { Pencil, Trash2, Check, X, Package, Truck, Clock, LogOut, CaseUpper, LocateIcon, MessageCircle } from "lucide-react"
 import { useCourierProvider } from "@/hooks/useCourierProvider"
+import { getCustomerTrustLabel, type CustomerTrustLabel } from "@/lib/order-status"
 
 interface Order {
   id: string;
@@ -27,6 +28,7 @@ export default function AdminOrdersPage() {
   const [editedData, setEditedData] = useState<any>({})
   const [popup, setPopup] = useState<{ type: "delete" | "dispatch"; id: string | null } | null>(null)
   const [status, setStatus] = useState<string | null>(null)
+  const [customerLabels, setCustomerLabels] = useState<Record<string, CustomerTrustLabel>>({})
 
   const router = useRouter()
   const { provider } = useCourierProvider()
@@ -132,6 +134,12 @@ Shukriya.`
   }
 
   setOrders(allOrders)
+
+  const labels: Record<string, CustomerTrustLabel> = {}
+  for (const order of allOrders) {
+    labels[order.id] = getCustomerTrustLabel(order.phone, order.id, allOrders)
+  }
+  setCustomerLabels(labels)
 
   const pending = allOrders.filter((o: Order) => !o.dispatched)
   setFilteredOrders(pending)
@@ -264,6 +272,29 @@ Shukriya.`
   if (loading) return <LoadingSpinner />
   if (!isAllowed) return null
 
+  const trustBadge = (orderId: string) => {
+    const label = customerLabels[orderId] || "new"
+    if (label === "trusted") {
+      return (
+        <span className="rounded-full bg-emerald-600 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
+          Trusted
+        </span>
+      )
+    }
+    if (label === "high-risk") {
+      return (
+        <span className="rounded-full bg-red-600 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
+          High Risk
+        </span>
+      )
+    }
+    return (
+      <span className="rounded-full bg-sky-600 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
+        New Customer
+      </span>
+    )
+  }
+
   return (
     <div className="min-h-screen  text-zinc-100 font-sans selection:bg-orange-700/30">
       <div className="max-w-7xl mx-auto px-6 py-12">
@@ -321,7 +352,10 @@ Shukriya.`
                         onChange={(e) => setEditedData({...editedData, name: e.target.value})}
                       />
                     ) : (
-                      <h3 className="text-xl font-bold text-blue-500 group-hover:text-orange-500 transition-colors">{order.name}</h3>
+                      <div>
+                        <h3 className="text-xl font-bold text-blue-500 group-hover:text-orange-500 transition-colors">{order.name}</h3>
+                        <div className="mt-2">{trustBadge(order.id)}</div>
+                      </div>
                     )}
                     <p className="text-[10px] text-zinc-500 font-mono mt-1 uppercase tracking-tighter">ID: {order.id.slice(0, 12)}...</p>
                   </div>
