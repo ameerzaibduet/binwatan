@@ -97,7 +97,7 @@ export default function HomePage() {
               <Minus className="text-orange-400 w-5" />
             </div>
             <p className="text-sm text-slate-500">
-              {Products.length} products across all collections
+              {Products.length} Products Across All Collections
             </p>
           </div>
 
