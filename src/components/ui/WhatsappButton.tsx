@@ -1,11 +1,31 @@
 "use client";
 
 import React from "react";
+import { usePathname } from "next/navigation";
 import { FaWhatsapp } from "react-icons/fa";
+import { Products } from "@/lib/products";
 
 const WhatsAppButton: React.FC = () => {
+  const pathname = usePathname();
   const phoneNumber = "+923172017176"; // Your number
-  const message = "Hello! I want to Know More about your product."; // Default message
+  const productMatch = pathname.match(/^\/products\/([^/]+)/);
+  const categoryMatch = pathname.match(/^\/category\/([^/]+)/);
+
+  const product = productMatch
+    ? Products.find((item) => item.id === decodeURIComponent(productMatch[1]))
+    : undefined;
+
+  const category = product
+    ? product.category
+    : categoryMatch
+      ? decodeURIComponent(categoryMatch[1])
+      : "";
+
+  const message = product
+    ? `Hello! I want to know more about this product: ${product.name}. Category: ${product.category}.`
+    : category
+      ? `Hello! I want to know more about products in this category: ${category}.`
+      : "Hello! I want to know more about your products.";
 
   const whatsappLink = `https://wa.me/${phoneNumber.replace(
     /[^\d]/g,
