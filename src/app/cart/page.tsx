@@ -4,6 +4,7 @@ import { useCart } from "@/lib/use-cart"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
+import { buildTikTokCartParams, trackTikTokEvent } from "@/lib/tiktok"
 
 export default function CartPage() {
   const {
@@ -38,7 +39,7 @@ export default function CartPage() {
           <div className="space-y-6">
             {cart.map((item) => (
               <div
-                key={item.id}
+                key={`${item.id}-${item.color}-${item.size ?? ""}`}
                 className="flex items-center gap-6 border-b pb-4"
               >
                 <img
@@ -49,17 +50,23 @@ export default function CartPage() {
                 <div className="flex-1">
                   <h3 className="text-lg font-semibold">{item.name}</h3>
                   <p className="text-gray-600">PKR {item.price}</p>
+                  {item.color && (
+                    <p className="text-sm text-gray-500 capitalize">Color: {item.color}</p>
+                  )}
+                  {item.size && (
+                    <p className="text-sm text-gray-500">Size: {item.size}</p>
+                  )}
 
                   <div className="flex items-center gap-3 mt-2">
                     <button
-                      onClick={() => decreaseQuantity(item.id)}
+                      onClick={() => decreaseQuantity(item.id, item.color, item.size)}
                       className="px-3 py-1 bg-gray-200 rounded"
                     >
                       -
                     </button>
                     <span>{item.quantity}</span>
                     <button
-                      onClick={() => increaseQuantity(item.id)}
+                      onClick={() => increaseQuantity(item.id, item.color, item.size)}
                       className="px-3 py-1 bg-gray-200 rounded"
                     >
                       +
@@ -70,7 +77,7 @@ export default function CartPage() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => removeFromCart(item.id)}
+                  onClick={() => removeFromCart(item.id, item.color, item.size)}
                   title="Remove"
                 >
                   🗑️
@@ -89,6 +96,7 @@ export default function CartPage() {
               <Button
                 className="w-full"
                 onClick={() => {
+                  trackTikTokEvent("InitiateCheckout", buildTikTokCartParams(cart))
                   router.push("/checkout")
                 }}
               >

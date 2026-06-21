@@ -24,6 +24,11 @@ const categoryDetails: Record<string, { label: string; description: string }> = 
     description:
       "Practical top-cover protection for compact vehicles with a clean fit and dependable waterproof material.",
   },
+  "rain suites": {
+    label: "Full-body rain protection",
+    description:
+      "Waterproof rain suits in multiple colors and sizes — stay dry on the road with Small, Medium, and Large options.",
+  },
 }
 
 export default function CategoryPage() {

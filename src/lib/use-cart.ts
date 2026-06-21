@@ -1,21 +1,35 @@
 import { create } from "zustand"
 
-type Product = {
+type CartItem = {
   id: string
   name: string
   price: number
   image: string
   quantity: number
-  color?: string // ✅ Added color
+  color?: string
+  size?: string
+}
+
+function cartItemKey(item: Pick<CartItem, "id" | "color" | "size">) {
+  return `${item.id}::${item.color ?? ""}::${item.size ?? ""}`
+}
+
+function matchesCartItem(
+  item: CartItem,
+  id: string,
+  color?: string,
+  size?: string
+) {
+  return cartItemKey(item) === cartItemKey({ id, color, size })
 }
 
 type CartStore = {
-  cart: Product[]
-  addToCart: (product: Product) => void
-  removeFromCart: (id: string, color?: string) => void // ✅ accepts color
+  cart: CartItem[]
+  addToCart: (product: CartItem) => void
+  removeFromCart: (id: string, color?: string, size?: string) => void
   clearCart: () => void
-  increaseQuantity: (id: string, color?: string) => void // ✅ accepts color
-  decreaseQuantity: (id: string, color?: string) => void // ✅ accepts color
+  increaseQuantity: (id: string, color?: string, size?: string) => void
+  decreaseQuantity: (id: string, color?: string, size?: string) => void
 }
 
 export const useCart = create<CartStore>((set) => ({
@@ -23,45 +37,40 @@ export const useCart = create<CartStore>((set) => ({
 
   addToCart: (product) =>
     set((state) => {
-      const existing = state.cart.find(
-        (item) => item.id === product.id && item.color === product.color // ✅ consider color
-      )
+      const existing = state.cart.find((item) => matchesCartItem(item, product.id, product.color, product.size))
       if (existing) {
         return {
           cart: state.cart.map((item) =>
-            item.id === product.id && item.color === product.color
+            matchesCartItem(item, product.id, product.color, product.size)
               ? { ...item, quantity: item.quantity + 1 }
               : item
           ),
         }
-      } else {
-        return { cart: [...state.cart, product] }
       }
+      return { cart: [...state.cart, product] }
     }),
 
-  removeFromCart: (id, color) =>
+  removeFromCart: (id, color, size) =>
     set((state) => ({
-      cart: state.cart.filter(
-        (item) => !(item.id === id && item.color === color) // ✅ match both
-      ),
+      cart: state.cart.filter((item) => !matchesCartItem(item, id, color, size)),
     })),
 
   clearCart: () => set({ cart: [] }),
 
-  increaseQuantity: (id, color) =>
+  increaseQuantity: (id, color, size) =>
     set((state) => ({
       cart: state.cart.map((item) =>
-        item.id === id && item.color === color
+        matchesCartItem(item, id, color, size)
           ? { ...item, quantity: item.quantity + 1 }
           : item
       ),
     })),
 
-  decreaseQuantity: (id, color) =>
+  decreaseQuantity: (id, color, size) =>
     set((state) => ({
       cart: state.cart
         .map((item) =>
-          item.id === id && item.color === color
+          matchesCartItem(item, id, color, size)
             ? { ...item, quantity: item.quantity - 1 }
             : item
         )

@@ -562,4 +562,61 @@ Open parcel allowed
       },
     ]
   },
+
+  /* Rain Suites */
+
+  {
+    id: "23",
+    name: "Rain Suit",
+    price: 1500,
+    image: "/images/rain-suite-black.png",
+    category: "Rain Suites",
+    description: `Free delivery
+Open parcel allowed
+100% waterproof
+Available in Small, Medium & Large`,
+    quantity: 1,
+    sizes: ["Small", "Medium", "Large"],
+    colors: [
+      { name: "black", image: "/images/rain-suite-black.png", default: true },
+      { name: "blue", image: "/images/rain-suite-blue.png" },
+      { name: "gray", image: "/images/rain-suite-gray.png" },
+    ],
+  },
+  {
+    id: "24",
+    name: "Rain Suit",
+    price: 1500,
+    image: "/images/rain-suite-blue.png",
+    category: "Rain Suites",
+    description: `Free delivery
+Open parcel allowed
+100% waterproof
+Available in Small, Medium & Large`,
+    quantity: 1,
+    sizes: ["Small", "Medium", "Large"],
+    colors: [
+      { name: "blue", image: "/images/rain-suite-blue.png", default: true },
+      { name: "black", image: "/images/rain-suite-black.png" },
+      { name: "gray", image: "/images/rain-suite-gray.png" },
+    ],
+  },
+  {
+    id: "25",
+    name: "Rain Suit",
+    price: 1500,
+    image: "/images/rain-suite-gray.png",
+    category: "Rain Suites",
+    description: `Free delivery
+Open parcel allowed
+100% waterproof
+Available in Small, Medium & Large`,
+    quantity: 1,
+    sizes: ["Small", "Medium", "Large"],
+    colors: [
+      { name: "gray", image: "/images/rain-suite-gray.png", default: true },
+      { name: "black", image: "/images/rain-suite-black.png" },
+      { name: "blue", image: "/images/rain-suite-blue.png" },
+    ],
+  },
 ]

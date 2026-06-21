@@ -22,8 +22,14 @@ import {
 import { ChevronsUpDown, MapPin, ShoppingBag } from "lucide-react"
 import { CITIES } from "@/lib/cities"
 import { cartContainsTopCover } from "@/lib/car-top-cover"
+import { cartContainsRainSuit } from "@/lib/rain-suit"
 import { formatPrice } from "@/lib/format-price"
 import { useCustomerOrders } from "@/lib/use-customer-orders"
+import {
+  buildTikTokCartParams,
+  identifyTikTokCustomer,
+  trackTikTokEvent,
+} from "@/lib/tiktok"
 
 export default function CheckoutPage() {
   const { cart, clearCart } = useCart()
@@ -34,6 +40,7 @@ export default function CheckoutPage() {
 
   const [name, setName] = useState("")
   const [number, setNumber] = useState("")
+  const [email, setEmail] = useState("")
   const [city, setCity] = useState("")
   const [address, setAddress] = useState("")
 
@@ -66,7 +73,8 @@ export default function CheckoutPage() {
 
   const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
   const hasTopCover = cartContainsTopCover(cart)
-  const showBikeOptions = !hasTopCover
+  const hasRainSuit = cartContainsRainSuit(cart)
+  const showBikeOptions = !hasTopCover && !hasRainSuit
 
   const getLocation = () => {
     if (!navigator.geolocation) {
@@ -119,7 +127,7 @@ export default function CheckoutPage() {
     const order = {
       name,
       phone: number,
-      email: null,
+      email: email || null,
       city,
       address,
       bike_specifications: selectedBikes.join(", "),
@@ -131,6 +139,7 @@ export default function CheckoutPage() {
         price: item.price,
         quantity: item.quantity,
         color: item.color ?? null,
+        size: item.size ?? null,
         image: item.image,
       })),
       total,
@@ -165,6 +174,8 @@ export default function CheckoutPage() {
     setPhone(data.phone)
     sessionStorage.setItem("lastPlacedOrder", JSON.stringify(savedOrder))
 
+    await identifyTikTokCustomer({ email, phone: number })
+    trackTikTokEvent("Purchase", buildTikTokCartParams(cart))
     clearCart()
     router.push("/order-success")
   }
@@ -191,6 +202,8 @@ export default function CheckoutPage() {
               placeholder="Full name"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              name="name"
+              autoComplete="name"
               className="h-12 rounded-xl"
             />
 
@@ -198,6 +211,20 @@ export default function CheckoutPage() {
               placeholder="Phone number (03XXXXXXXXX)"
               value={number}
               onChange={(e) => setNumber(e.target.value)}
+              type="tel"
+              name="phone"
+              autoComplete="tel"
+              inputMode="tel"
+              className="h-12 rounded-xl"
+            />
+
+            <Input
+              placeholder="Email address (optional)"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              type="email"
+              name="email"
+              autoComplete="email"
               className="h-12 rounded-xl"
             />
 
@@ -306,7 +333,7 @@ export default function CheckoutPage() {
               <ul className="space-y-3">
                 {cart.map((item) => (
                   <li
-                    key={`${item.id}-${item.color}`}
+                    key={`${item.id}-${item.color}-${item.size ?? ""}`}
                     className="flex gap-3 border-b border-slate-100 pb-3 last:border-0 last:pb-0"
                   >
                     <div className="relative size-14 shrink-0 overflow-hidden rounded-lg bg-slate-100">
@@ -325,7 +352,11 @@ export default function CheckoutPage() {
                       {item.color && (
                         <p className="truncate text-xs capitalize text-slate-500">
                           {item.color}
+                          {item.size ? ` · ${item.size}` : ""}
                         </p>
+                      )}
+                      {!item.color && item.size && (
+                        <p className="truncate text-xs text-slate-500">{item.size}</p>
                       )}
                       <p className="text-xs text-slate-500">Qty: {item.quantity}</p>
                     </div>

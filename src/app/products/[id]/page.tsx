@@ -6,6 +6,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { Products } from "@/lib/products"
 import { isCarTopCoverProduct } from "@/lib/car-top-cover"
+import { isRainSuitProduct, RAIN_SUIT_SIZES } from "@/lib/rain-suit"
 import { formatPrice } from "@/lib/format-price"
 import ProductCategoryRow from "@/components/ProductCategoryRow"
 import ProductColorPicker from "@/components/ProductColorPicker"
@@ -13,24 +14,13 @@ import { groupRelatedProductsByCategory } from "@/lib/group-products-by-category
 import { Button } from "@/components/ui/button"
 import { useCart } from "@/lib/use-cart"
 import { useCartUI } from "@/lib/use-cart-ui"
+import { buildTikTokProductParams, trackTikTokEvent } from "@/lib/tiktok"
 import clsx from "clsx"
 import { motion, AnimatePresence } from "framer-motion"
 import { ArrowLeft, Check, Minus, ShoppingBag } from "lucide-react"
 
 type Props = {
   params: Promise<{ id: string }>
-}
-
-const ttqTrack = (eventName: string, params: Record<string, unknown> = {}) => {
-  if (
-    typeof window !== "undefined" &&
-    (window as unknown as { ttq?: { track: (e: string, p: Record<string, unknown>) => void } }).ttq
-  ) {
-    ;(window as unknown as { ttq: { track: (e: string, p: Record<string, unknown>) => void } }).ttq.track(
-      eventName,
-      params
-    )
-  }
 }
 
 const bikeTypes = ["70cc", "110cc", "125cc", "150cc"]
@@ -57,6 +47,7 @@ export default function ProductDetailPage({ params }: Props) {
   const { openCart, closeCart } = useCartUI()
 
   const isCarTopCover = product ? isCarTopCoverProduct(product) : false
+  const isRainSuit = product ? isRainSuitProduct(product) : false
 
   const [selectedColor, setSelectedColor] = useState(
     product?.colors?.find((c) => c.default) || product?.colors?.[0]
@@ -65,6 +56,7 @@ export default function ProductDetailPage({ params }: Props) {
     product?.colors?.find((c) => c.default)?.name || product?.colors?.[0]?.name || "black"
   )
   const [selectedCC, setSelectedCC] = useState("70cc")
+  const [selectedSize, setSelectedSize] = useState<string>(RAIN_SUIT_SIZES[1])
 
   if (!product) return notFound()
 
@@ -84,13 +76,7 @@ export default function ProductDetailPage({ params }: Props) {
   const benefits = getCompactBenefits(product.description)
 
   useEffect(() => {
-    ttqTrack("ViewContent", {
-      content_id: product.id,
-      content_type: "product",
-      content_name: product.name,
-      price: product.price,
-      currency: "PKR",
-    })
+    trackTikTokEvent("ViewContent", buildTikTokProductParams(product))
   }, [product])
 
   const handleAddToCart = () => {
@@ -101,14 +87,9 @@ export default function ProductDetailPage({ params }: Props) {
       image: mainImage,
       quantity: 1,
       color: selectionLabel,
+      ...(isRainSuit && { size: selectedSize }),
     })
-    ttqTrack("AddToCart", {
-      content_id: product.id,
-      content_type: "product",
-      quantity: 1,
-      price: product.price,
-      currency: "PKR",
-    })
+    trackTikTokEvent("AddToCart", buildTikTokProductParams(product))
     openCart()
   }
 
@@ -120,13 +101,9 @@ export default function ProductDetailPage({ params }: Props) {
       image: mainImage,
       quantity: 1,
       color: selectionLabel,
+      ...(isRainSuit && { size: selectedSize }),
     })
-    ttqTrack("InitiateCheckout", {
-      content_id: product.id,
-      content_type: "product",
-      value: product.price,
-      currency: "PKR",
-    })
+    trackTikTokEvent("InitiateCheckout", buildTikTokProductParams(product))
     closeCart()
     router.push("/checkout")
   }
@@ -213,6 +190,29 @@ export default function ProductDetailPage({ params }: Props) {
               </div>
             )}
 
+            {isRainSuit && (
+              <div className="mt-5">
+                <p className="text-sm font-semibold text-slate-900">Size</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {RAIN_SUIT_SIZES.map((size) => (
+                    <button
+                      key={size}
+                      type="button"
+                      onClick={() => setSelectedSize(size)}
+                      className={clsx(
+                        "rounded-full border px-4 py-2 text-sm font-medium transition-all",
+                        selectedSize === size
+                          ? "border-slate-900 bg-slate-900 text-white"
+                          : "border-slate-200 bg-white text-slate-700 hover:border-orange-300"
+                      )}
+                    >
+                      {size}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="mt-5 flex flex-col gap-2.5 sm:flex-row">
               <Button
                 onClick={handleBuyNow}
@@ -242,7 +242,7 @@ export default function ProductDetailPage({ params }: Props) {
               ))}
             </ul>
 
-            {!isCarTopCover && (
+            {!isCarTopCover && !isRainSuit && (
               <div className="mt-5">
                 <p className="text-sm font-semibold text-slate-900">Bike engine size</p>
                 <div className="mt-2 flex flex-wrap gap-2">

@@ -3,13 +3,17 @@
 import { Button } from "@/components/ui/button"
 import { useCart } from "@/context/CartContext"
 import { Product } from "@/types/product"
+import { buildTikTokProductParams, trackTikTokEvent } from "@/lib/tiktok"
 
 export default function AddToCartButton({ product }: { product: Product }) {
   const { addToCart } = useCart()
 
   return (
     <Button
-      onClick={() => addToCart(product)}
+      onClick={() => {
+        addToCart(product)
+        trackTikTokEvent("AddToCart", buildTikTokProductParams(product))
+      }}
       className="
         w-full sm:w-auto
         px-6 py-3

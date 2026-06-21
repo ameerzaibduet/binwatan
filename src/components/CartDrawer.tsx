@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import Image from "next/image"
 import { Minus, Plus, Trash2, X } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { buildTikTokCartParams, trackTikTokEvent } from "@/lib/tiktok"
 
 type Props = {
   open: boolean
@@ -44,7 +45,7 @@ export default function CartDrawer({ open, onOpenChange }: Props) {
             <>
               <div className="space-y-4">
                 {cart.map((item) => (
-                  <div key={item.id + item.color} className="flex items-center gap-4 border-b pb-4">
+                  <div key={`${item.id}-${item.color}-${item.size ?? ""}`} className="flex items-center gap-4 border-b pb-4">
                     <Image
                       src={item.image}
                       alt={item.name}
@@ -59,17 +60,20 @@ export default function CartDrawer({ open, onOpenChange }: Props) {
                       {item.color && (
                         <div className="flex items-center gap-2 mt-1">
                           <span className="text-xs text-gray-500">Color:</span>
-                          <div
-                            className="w-4 h-4 rounded-full border"
-                            style={{ backgroundColor: item.color }}
-                          />
                           <span className="text-xs text-gray-500 capitalize">{item.color}</span>
+                        </div>
+                      )}
+
+                      {item.size && (
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-xs text-gray-500">Size:</span>
+                          <span className="text-xs text-gray-500">{item.size}</span>
                         </div>
                       )}
 
                       <div className="flex items-center gap-2 mt-2">
                         <button
-                          onClick={() => decreaseQuantity(item.id, item.color)}
+                          onClick={() => decreaseQuantity(item.id, item.color, item.size)}
                           className={cn(
                             "w-8 h-8 flex items-center justify-center rounded-full border border-gray-300 hover:bg-gray-100",
                             item.quantity <= 1 && "opacity-50 cursor-not-allowed"
@@ -83,7 +87,7 @@ export default function CartDrawer({ open, onOpenChange }: Props) {
                         <span className="min-w-[20px] text-center">{item.quantity}</span>
 
                         <button
-                          onClick={() => increaseQuantity(item.id, item.color)}
+                          onClick={() => increaseQuantity(item.id, item.color, item.size)}
                           className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-300 hover:bg-gray-100"
                           title="Increase quantity"
                         >
@@ -92,7 +96,7 @@ export default function CartDrawer({ open, onOpenChange }: Props) {
                       </div>
                     </div>
 
-                    <button onClick={() => removeFromCart(item.id, item.color)}>
+                    <button onClick={() => removeFromCart(item.id, item.color, item.size)}>
                       <Trash2 className="w-4 h-4 text-red-500 hover:text-red-700" />
                     </button>
                   </div>
@@ -107,6 +111,7 @@ export default function CartDrawer({ open, onOpenChange }: Props) {
                 <Button
                   className="w-full"
                   onClick={() => {
+                    trackTikTokEvent("InitiateCheckout", buildTikTokCartParams(cart))
                     onOpenChange(false)
                     setTimeout(() => router.push("/checkout"), 50)
                   }}

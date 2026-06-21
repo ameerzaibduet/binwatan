@@ -3,6 +3,7 @@
 import { useCart } from "@/lib/use-cart"
 import { useCartUI } from "@/lib/use-cart-ui"
 import { colorMap } from "@/lib/color-map"
+import { isRainSuitProduct } from "@/lib/rain-suit"
 import { formatPrice } from "@/lib/format-price"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
@@ -10,6 +11,7 @@ import Image from "next/image"
 import { Product } from "@/types/product"
 import { Eye, ShoppingBag, Truck } from "lucide-react"
 import type { MouseEvent } from "react"
+import { buildTikTokProductParams, trackTikTokEvent } from "@/lib/tiktok"
 
 type Props = {
   product: Product
@@ -22,16 +24,30 @@ export default function ProductCard({ product }: Props) {
 
   const defaultColor =
     product.colors.find((c) => c.default)?.name || product.colors[0]?.name || ""
+  const isRainSuit = isRainSuitProduct(product)
+  const defaultSize = isRainSuit ? "Medium" : undefined
 
   const handleAddToCart = (e: MouseEvent) => {
     e.stopPropagation()
-    addToCart({ ...product, quantity: 1, color: defaultColor })
+    addToCart({
+      ...product,
+      quantity: 1,
+      color: defaultColor,
+      ...(defaultSize && { size: defaultSize }),
+    })
+    trackTikTokEvent("AddToCart", buildTikTokProductParams(product))
     openCart()
   }
 
   const handleBuyNow = (e: MouseEvent) => {
     e.stopPropagation()
-    addToCart({ ...product, quantity: 1, color: defaultColor })
+    addToCart({
+      ...product,
+      quantity: 1,
+      color: defaultColor,
+      ...(defaultSize && { size: defaultSize }),
+    })
+    trackTikTokEvent("InitiateCheckout", buildTikTokProductParams(product))
     router.push("/checkout")
   }
 

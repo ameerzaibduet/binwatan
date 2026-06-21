@@ -17,7 +17,9 @@ export type Product = {
     name: string
     image: string
     displayImage?: string
-    default?: boolean // ✅ Add this line to fix the error
+    default?: boolean
   }[]
+  sizes?: string[]
   color?: string
+  size?: string
 }

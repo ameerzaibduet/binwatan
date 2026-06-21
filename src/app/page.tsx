@@ -9,10 +9,13 @@ import { Minus } from "lucide-react"
 import Link from "next/link"
 
 export default function HomePage() {
-  const featuredProductIds = ["15", "13", "18", "4", "9", "19", "16", "2"]
-  const products = featuredProductIds
-    .map((id) => Products.find((product) => product.id === id))
-    .filter((product): product is (typeof Products)[number] => Boolean(product))
+  const categoryOrder = ["Parachute", "Rexine", "Car Top Cover", "Rain Suites"]
+  const productGroups = categoryOrder
+    .map((category) => ({
+      category,
+      products: Products.filter((p) => p.category === category),
+    }))
+    .filter((group) => group.products.length > 0)
 
   const categories = [
     {
@@ -29,6 +32,11 @@ export default function HomePage() {
       name: "Car Top",
       image: "/images/boolan-cover.png",
       href: "/category/Car%20Top%20Cover",
+    },
+    {
+      name: "Rain Suites",
+      image: "/images/rain-suite-black.png",
+      href: "/category/Rain%20Suites",
     },
   ]
 
@@ -77,32 +85,58 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 3. Top Products - Systematic Grid Spacing */}
+      {/* 3. Top Products */}
       <section className="bg-white py-6 border-y border-slate-100">
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex flex-col items-center text-center mb-10">
-            <div className="flex flex-col items-center text-center">
-              <div className="flex items-center gap-2 mb-2">
-                <Minus className="text-orange-400 w-5" />
-                <span className="text-orange-400 text-[10px] font-bold uppercase tracking-[0.22em]">Our Essentials</span>
-                <Minus className="text-orange-400 w-5" />
-              </div>
+            <div className="flex items-center gap-2 mb-2">
+              <Minus className="text-orange-400 w-5" />
+              <span className="text-orange-400 text-[10px] font-bold uppercase tracking-[0.22em]">
+                Our Essentials
+              </span>
+              <Minus className="text-orange-400 w-5" />
             </div>
-      
+            <p className="text-sm text-slate-500">
+              {Products.length} products across all collections
+            </p>
           </div>
-          
-          <motion.div
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-10"
-            initial={{ opacity: 0.6 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.3, ease: "easeOut" }}
-          >
-            {products.map((product) => (
-              <div key={product.id}>
-                <ProductCard product={product} />
+
+          <div className="space-y-14">
+            {productGroups.map((group) => (
+              <div key={group.category}>
+                <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-500">
+                      {group.category}
+                    </p>
+                    <h2 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">
+                      {group.products.length} available
+                    </h2>
+                  </div>
+                  <Link
+                    href={`/category/${encodeURIComponent(group.category)}`}
+                    className="text-sm font-bold uppercase tracking-[0.16em] text-slate-800 transition-colors hover:text-orange-500"
+                  >
+                    View all →
+                  </Link>
+                </div>
+
+                <motion.div
+                  className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-10"
+                  initial={{ opacity: 0.6 }}
+                  whileInView={{ opacity: 1 }}
+                  viewport={{ once: true, margin: "-40px" }}
+                  transition={{ duration: 0.3, ease: "easeOut" }}
+                >
+                  {group.products.map((product) => (
+                    <div key={product.id}>
+                      <ProductCard product={product} />
+                    </div>
+                  ))}
+                </motion.div>
               </div>
             ))}
-          </motion.div>
+          </div>
         </div>
       </section>
 
