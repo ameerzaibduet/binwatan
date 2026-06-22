@@ -58,6 +58,12 @@ export default function ProductDetailPage({ params }: Props) {
   const [selectedCC, setSelectedCC] = useState("70cc")
   const [selectedSize, setSelectedSize] = useState<string>(RAIN_SUIT_SIZES[1])
 
+  useEffect(() => {
+    if (product) {
+      trackTikTokEvent("ViewContent", buildTikTokProductParams(product))
+    }
+  }, [product])
+
   if (!product) return notFound()
 
   const activeCoverColor =
@@ -74,10 +80,6 @@ export default function ProductDetailPage({ params }: Props) {
     : selectedColor?.name
 
   const benefits = getCompactBenefits(product.description)
-
-  useEffect(() => {
-    trackTikTokEvent("ViewContent", buildTikTokProductParams(product))
-  }, [product])
 
   const handleAddToCart = () => {
     addToCart({
