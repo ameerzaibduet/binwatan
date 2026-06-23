@@ -5,7 +5,7 @@ export const Products: Product[] = [
     id: "4",
     name: "Parachute Bike Cover",
     price: 1200 ,
-    image: "/images/4pocketBlack.jpeg",
+    image: "/images/black-display.jpeg",
     category: "Parachute",
     description: ` Free delivery
  Open parcel allowed
@@ -13,13 +13,13 @@ export const Products: Product[] = [
  1-year warranty`,
     quantity: 1,
     colors: [
-      { name: "black", image: "/images/4pocketBlack.jpeg", default: true },
-      { name: "green", image: "/images/4pocketGreen.png" },
-      { name: "blue", image: "/images/4pocketBlue.png" },
-      { name: "silver", image: "/images/4psilver.jpeg"},
-      { name: "darkBrown", image: "/images/4Ppdarkbrown.jpeg"},
-      { name: "gray", image: "/images/gray.jpeg"},
-      { name: "red", image: "/images/4PRed.png"}
+      { name: "black", image: "/images/black-display.jpeg", default: true },
+      { name: "green", image: "/images/green-display.jpeg" },
+      { name: "blue", image: "/images/blue-display.jpeg" },
+      { name: "silver", image: "/images/silver-display.jpeg"},
+      { name: "darkBrown", image: "/images/brown-display.jpeg"},
+      { name: "gray", image: "/images/silver-display.jpeg"},
+      { name: "red", image: "/images/mahroon-display.jpeg"}
     
     ]
   },
@@ -27,7 +27,7 @@ export const Products: Product[] = [
     id: "2",
     name: "Parachute Bike Cover",
     price: 1200 ,
-    image: "/images/4pocketGreen.png",
+    image: "/images/green-display.jpeg",
     category: "Parachute",
     description: ` Free delivery
  Open parcel allowed
@@ -35,13 +35,13 @@ export const Products: Product[] = [
  1-year warranty`,
     quantity: 1,
     colors: [
-      { name: "green", image: "/images/4pocketGreen.png", default: true },
-      { name: "black", image: "/images/4pocketBlack.jpeg" },
-      { name: "blue", image: "/images/4pocketBlue.png" },
-      { name: "silver", image: "/images/4psilver.jpeg"},
-      { name: "darkBrown", image: "/images/4Ppdarkbrown.jpeg"},
-      { name: "gray", image: "/images/gray.jpeg"},
-      { name: "red", image: "/images/4PRed.png"}
+      { name: "green", image: "/images/green-display.jpeg", default: true },
+      { name: "black", image: "/images/black-display.jpeg" },
+      { name: "blue", image: "/images/blue-display.jpeg" },
+      { name: "silver", image: "/images/silver-display.jpeg"},
+      { name: "darkBrown", image: "/images/brown-display.jpeg"},
+      { name: "gray", image: "/images/silver-display.jpeg"},
+      { name: "red", image: "/images/mahroon-display.jpeg"}
     
     ]
   },
@@ -49,7 +49,7 @@ export const Products: Product[] = [
     id: "3",
     name: "Parachute Bike Cover",
     price: 1200 ,
-    image: "/images/4pocketBlue.png",
+    image: "/images/blue-display.jpeg",
     category: "Parachute",
     description: ` Free delivery
  Open parcel allowed
@@ -57,13 +57,13 @@ export const Products: Product[] = [
  1-year warranty`,
     quantity: 1,
     colors: [
-      { name: "blue", image: "/images/4pocketBlue.png", default: true },
-      { name: "black", image: "/images/4pocketBlack.jpeg" },
-      { name: "green", image: "/images/4pocketGreen.png" },
-      { name: "silver", image: "/images/4psilver.jpeg"},
-      { name: "darkBrown", image: "/images/4Ppdarkbrown.jpeg"},
-      { name: "gray", image: "/images/gray.jpeg"},
-      { name: "red", image: "/images/4PRed.png"}
+      { name: "blue", image: "/images/blue-display.jpeg", default: true },
+      { name: "black", image: "/images/black-display.jpeg" },
+      { name: "green", image: "/images/green-display.jpeg" },
+      { name: "silver", image: "/images/silver-display.jpeg"},
+      { name: "darkBrown", image: "/images/brown-display.jpeg"},
+      { name: "gray", image: "/images/silver-display.jpeg"},
+      { name: "red", image: "/images/mahroon-display.jpeg"}
     
     ]
   },
@@ -72,7 +72,7 @@ export const Products: Product[] = [
     id: "5",
     name: "Parachute Bike Cover",
     price: 1200 ,
-    image: "/images/gray.jpeg",
+    image: "/images/silver-display.jpeg",
     category: "Parachute",
     description: ` Free delivery
  Open parcel allowed
@@ -80,20 +80,20 @@ export const Products: Product[] = [
  1-year warranty`,
     quantity: 1,
     colors: [
-      { name: "gray", image: "/images/gray.jpeg", default: true },
-      { name: "black", image: "/images/4pocketBlack.jpeg" },
-      { name: "green", image: "/images/4pocketGreen.png" },
-      { name: "blue", image: "/images/4pocketBlue.png"},
-      { name: "silver", image: "/images/4psilver.jpeg"},
-      { name: "darkBrown", image: "/images/4Ppdarkbrown.jpeg"},
-      { name: "red", image: "/images/4PRed.png"}
+      { name: "gray", image: "/images/silver-display.jpeg", default: true },
+      { name: "black", image: "/images/black-display.jpeg" },
+      { name: "green", image: "/images/green-display.jpeg" },
+      { name: "blue", image: "/images/blue-display.jpeg"},
+      { name: "silver", image: "/images/silver-display.jpeg"},
+      { name: "darkBrown", image: "/images/brown-display.jpeg"},
+      { name: "red", image: "/images/mahroon-display.jpeg"}
     ]
   },
    {
     id: "6",
     name: "Parachute Bike Cover",
     price: 1200 ,
-    image: "/images/4PRed.png",
+    image: "/images/mahroon-display.jpeg",
     category: "Parachute",
     description: ` Free delivery
  Open parcel allowed
@@ -101,13 +101,13 @@ export const Products: Product[] = [
  1-year warranty`,
     quantity: 1,
     colors: [
-      { name: "red", image: "/images/4PRed.png", default: true },
-      { name: "black", image: "/images/4pocketBlack.jpeg" },
-      { name: "green", image: "/images/4pocketGreen.png" },
-      { name: "blue", image: "/images/4pocketBlue.png"},
-      { name: "silver", image: "/images/4psilver.jpeg"},
-      { name: "darkBrown", image: "/images/4Ppdarkbrown.jpeg"},
-      { name: "gray", image: "/images/gray.jpeg"}
+      { name: "red", image: "/images/mahroon-display.jpeg", default: true },
+      { name: "black", image: "/images/black-display.jpeg" },
+      { name: "green", image: "/images/green-display.jpeg" },
+      { name: "blue", image: "/images/blue-display.jpeg"},
+      { name: "silver", image: "/images/silver-display.jpeg"},
+      { name: "darkBrown", image: "/images/brown-display.jpeg"},
+      { name: "gray", image: "/images/silver-display.jpeg"}
 
     ]
   },
@@ -115,7 +115,7 @@ export const Products: Product[] = [
     id: "7",
     name: "Parachute Bike Cover",
     price: 1200 ,
-    image: "/images/4psilver.jpeg",
+    image: "/images/silver-display.jpeg",
     category: "Parachute",
     description: ` Free delivery
  Open parcel allowed
@@ -123,13 +123,13 @@ export const Products: Product[] = [
  1-year warranty`,
     quantity: 1,
     colors: [
-      { name: "silver", image: "/images/4psilver.jpeg", default: true },
-      { name: "black", image: "/images/4pocketBlack.jpeg" },
-      { name: "green", image: "/images/4pocketGreen.png" },
-      { name: "blue", image: "/images/4pocketBlue.png"},
-      { name: "red", image: "/images/4PRed.png"},
-      { name: "darkBrown", image: "/images/4Ppdarkbrown.jpeg"},
-      { name: "gray", image: "/images/gray.jpeg"}
+      { name: "silver", image: "/images/silver-display.jpeg", default: true },
+      { name: "black", image: "/images/black-display.jpeg" },
+      { name: "green", image: "/images/green-display.jpeg" },
+      { name: "blue", image: "/images/blue-display.jpeg"},
+      { name: "red", image: "/images/mahroon-display.jpeg"},
+      { name: "darkBrown", image: "/images/brown-display.jpeg"},
+      { name: "gray", image: "/images/silver-display.jpeg"}
 
     ]
   },
@@ -137,7 +137,7 @@ export const Products: Product[] = [
     id: "8",
     name: "Parachute Bike Cover",
     price: 1200 ,
-    image: "/images/4Ppdarkbrown.jpeg",
+    image: "/images/brown-display.jpeg",
     category: "Parachute",
     description: ` Free delivery
  Open parcel allowed
@@ -145,13 +145,13 @@ export const Products: Product[] = [
  1-year warranty`,
     quantity: 1,
     colors: [
-      { name: "darkbrown", image: "/images/4Ppdarkbrown.jpeg", default: true },
-      { name: "black", image: "/images/4pocketBlack.jpeg" },
-      { name: "green", image: "/images/4pocketGreen.png" },
-      { name: "blue", image: "/images/4pocketBlue.png"},
-      { name: "red", image: "/images/4PRed.png"},
-      { name: "silver", image: "/images/4psilver.jpeg"},
-      { name: "gray", image: "/images/gray.jpeg"}
+      { name: "darkbrown", image: "/images/brown-display.jpeg", default: true },
+      { name: "black", image: "/images/black-display.jpeg" },
+      { name: "green", image: "/images/green-display.jpeg" },
+      { name: "blue", image: "/images/blue-display.jpeg"},
+      { name: "red", image: "/images/mahroon-display.jpeg"},
+      { name: "silver", image: "/images/silver-display.jpeg"},
+      { name: "gray", image: "/images/silver-display.jpeg"}
 
     ]
   },

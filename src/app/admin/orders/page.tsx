@@ -100,6 +100,28 @@ Shukriya.`
 
   window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank")
 }
+
+  const recalculateOrderTotal = (items: any[] = []) =>
+    items.reduce(
+      (sum, item) => sum + Number(item.price || 0) * Math.max(Number(item.quantity || 1), 1),
+      0
+    )
+
+  const updateEditedItem = (index: number, field: "color" | "quantity", value: string) => {
+    const nextItems = [...(editedData.items || [])]
+    const currentItem = nextItems[index] || {}
+    nextItems[index] = {
+      ...currentItem,
+      [field]: field === "quantity" ? Math.max(Number(value || 1), 1) : value,
+    }
+
+    setEditedData({
+      ...editedData,
+      items: nextItems,
+      total: recalculateOrderTotal(nextItems),
+    })
+  }
+
   const fetchOrders = async () => {
   setStatus("Syncing with database...")
 
@@ -252,7 +274,13 @@ Shukriya.`
 
   const saveEdit = async () => {
     try {
-      const { error } = await supabaseClient.from("orders").update(editedData).eq("id", editId!)
+      const updatedItems = editedData.items || []
+      const updatePayload = {
+        ...editedData,
+        total: recalculateOrderTotal(updatedItems),
+      }
+
+      const { error } = await supabaseClient.from("orders").update(updatePayload).eq("id", editId!)
       if (error) throw error
       await fetchOrders()
       setEditId(null)
@@ -377,7 +405,15 @@ Shukriya.`
                   <div className="flex flex-col">
                     <span className="text-zinc-500 mb-1">Shipping Address:</span>
                     {editId === order.id ? 
-                      <textarea className="bg-zinc-800 text-orange-500 text-xs p-2 rounded" value={editedData.address} onChange={(e) => setEditedData({...editedData, address: e.target.value})} /> 
+                      <div className="space-y-2">
+                        <textarea className="bg-zinc-800 text-orange-500 text-xs p-2 rounded" value={editedData.address || ""} onChange={(e) => setEditedData({...editedData, address: e.target.value})} />
+                        <input
+                          className="bg-zinc-800 text-orange-500 text-xs p-2 rounded"
+                          value={editedData.city || ""}
+                          onChange={(e) => setEditedData({...editedData, city: e.target.value})}
+                          placeholder="City"
+                        />
+                      </div>
                       : <span className="text-black leading-snug">{order.address}, <span className="text-orange-700">{order.city}</span></span>
                     }
                   </div>
@@ -405,10 +441,29 @@ Shukriya.`
                   <p className="text-[10px] font-bold text-zinc-600 uppercase mb-3 tracking-widest">Manifest</p>
                   <ul className="space-y-2">
                     {order.items?.map((item: any, i: number) => (
-                      <li key={i} className="flex justify-between text-xs border-b border-zinc-800/50 pb-1">
-                        <span className="text-black">{item.name} <span className="text-blue-500 font-bold">x{item.quantity} <span className="text-black"> {order.bike_specifications}</span></span> {item.color.toUpperCase()}</span>
+                      <li key={i} className="flex justify-between gap-3 text-xs border-b border-zinc-800/50 pb-2">
+                        {editId === order.id ? (
+                          <div className="grid flex-1 grid-cols-[1fr_70px_90px] gap-2">
+                            <span className="text-black">{item.name}</span>
+                            <input
+                              className="rounded bg-zinc-800 px-2 py-1 text-blue-500"
+                              min={1}
+                              type="number"
+                              value={editedData.items?.[i]?.quantity ?? item.quantity}
+                              onChange={(e) => updateEditedItem(i, "quantity", e.target.value)}
+                            />
+                            <input
+                              className="rounded bg-zinc-800 px-2 py-1 text-blue-500"
+                              value={editedData.items?.[i]?.color ?? item.color ?? ""}
+                              onChange={(e) => updateEditedItem(i, "color", e.target.value)}
+                              placeholder="Color"
+                            />
+                          </div>
+                        ) : (
+                          <span className="text-black">{item.name} <span className="text-blue-500 font-bold">x{item.quantity} <span className="text-black"> {order.bike_specifications}</span></span> {item.color.toUpperCase()}</span>
+                        )}
 
-                        <span className="text-black">  PKR {item.price * item.quantity}</span>
+                        <span className="text-black">PKR {item.price * item.quantity}</span>
                       </li>
                     ))}
                   </ul>
