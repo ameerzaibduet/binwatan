@@ -20,7 +20,7 @@ export default function HomePage() {
   const categories = [
     {
       name: "Parachute",
-      image: "/parachute.png",
+      image: "/images/black-display.jpeg",
       href: "/category/parachute",
     },
     {
@@ -30,7 +30,7 @@ export default function HomePage() {
     },
     {
       name: "Car Top",
-      image: "/images/boolan-cover.png",
+      image: "/images/boolan-cover2.png",
       href: "/category/Car%20Top%20Cover",
     },
     {
