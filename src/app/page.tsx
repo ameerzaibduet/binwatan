@@ -24,6 +24,11 @@ export default function HomePage() {
       href: "/category/parachute",
     },
     {
+      name: "Comando Covers",
+      image: "/images/comando-black.jpeg",
+      href: "/category/Comando%20Covers",
+    },
+    {
       name: "Rexine",
       image: "/rexine.png",
       href: "/category/Rexine",

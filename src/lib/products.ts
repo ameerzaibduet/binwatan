@@ -600,4 +600,135 @@ Available in Small, Medium & Large`,
     ],
   },
   
+
+  {
+    id: "25",
+    name: "Comando Black",
+    price: 1300 ,
+    image: "/images/comando-black.jpeg",
+    category: "Comando Covers",
+    description: ` Free delivery
+ Open parcel allowed
+ 100% waterproof
+ 1-year warranty`,
+    quantity: 1,
+    colors: [
+      { name: "Comando-Black", image: "/images/comando-black.jpeg", default: true },
+      { name: "Rangesrs-Black", image: "/images/rangesrs-black.jpeg" },
+      { name: "Black-dot", image: "/images/black-dot.jpeg" },
+      { name: "Rangers", image: "/images/rangers.jpeg"},
+      { name: "Rangers-yellow", image: "/images/Rangers-yellow.jpeg"},
+      { name: "Commando", image: "/images/commando.jpeg"},
+
+    ]
+  },
+  {
+    id: "26",
+    name: "Comando",
+    price: 1300 ,
+    image: "/images/comando.jpeg",
+    category: "Comando Covers",
+    description: ` Free delivery
+ Open parcel allowed
+ 100% waterproof
+ 1-year warranty`,
+    quantity: 1,
+    colors: [
+      { name: "Comando", image: "/images/comando.jpeg", default: true },
+      { name: "Rangesrs-Black", image: "/images/rangesrs-black.jpeg" },
+      { name: "Black-dot", image: "/images/black-dot.jpeg" },
+      { name: "Rangers", image: "/images/rangers.jpeg"},
+      { name: "Rangers-yellow", image: "/images/Rangers-yellow.jpeg"},
+      { name: "Commando-black", image: "/images/commando-black.jpeg"},
+
+    ]
+  },
+  {
+    id: "27",
+    name: "Rangers Black",
+    price: 1300 ,
+    image: "/images/rangers-black.jpeg",
+    category: "Comando Covers",
+    description: ` Free delivery
+ Open parcel allowed
+ 100% waterproof
+ 1-year warranty`,
+    quantity: 1,
+    colors: [
+      { name: "Rangers-Black", image: "/images/rangers-black.jpeg", default: true },
+      { name: "Comando", image: "/images/comando.jpeg" },
+      { name: "Black-dot", image: "/images/black-dot.jpeg" },
+      { name: "Rangers", image: "/images/rangers.jpeg"},
+      { name: "Rangers-yellow", image: "/images/Rangers-yellow.jpeg"},
+      { name: "Commando-black", image: "/images/commando-black.jpeg"},
+
+    ]
+  },
+
+  {
+    id: "28",
+    name: "Rangers",
+    price: 1300 ,
+    image: "/images/rangers.jpeg",
+    category: "Comando Covers",
+    description: ` Free delivery
+ Open parcel allowed
+ 100% waterproof
+ 1-year warranty`,
+    quantity: 1,
+    colors: [
+      { name: "Rangers", image: "/images/rangers.jpeg", default: true },
+      { name: "Comando", image: "/images/comando.jpeg" },
+      { name: "Black-dot", image: "/images/black-dot.jpeg" },
+      { name: "Rangers-black", image: "/images/rangers-black.jpeg"},
+      { name: "Rangers-yellow", image: "/images/Rangers-yellow.jpeg"},
+      { name: "Commando-black", image: "/images/commando-black.jpeg"},
+
+    ]
+  },
+{
+    id: "29",
+    name: "Rangers Yellow",
+    price: 1300 ,
+    image: "/images/rangers-yellow.jpeg",
+    category: "Comando Covers",
+    description: ` Free delivery
+ Open parcel allowed
+ 100% waterproof
+ 1-year warranty`,
+    quantity: 1,
+    colors: [
+      { name: "Rangers-yellow", image: "/images/rangers-yellow.jpeg", default: true },
+      { name: "Comando", image: "/images/comando.jpeg" },
+      { name: "Black-dot", image: "/images/black-dot.jpeg" },
+      { name: "Rangers-black", image: "/images/rangers-black.jpeg"},
+      { name: "Rangers", image: "/images/Rangers.jpeg"},
+      { name: "Commando-black", image: "/images/commando-black.jpeg"},
+
+    ]
+  },
+
+  {
+    id: "30",
+    name: "Black Dot",
+    price: 1300 ,
+    image: "/images/black-dot.jpeg",
+    category: "Comando Covers",
+    description: ` Free delivery
+ Open parcel allowed
+ 100% waterproof
+ 1-year warranty`,
+    quantity: 1,
+    colors: [
+      { name: "Black-dot", image: "/images/black-dot.jpeg", default: true },
+      { name: "Comando", image: "/images/comando.jpeg" },
+      { name: "Rangers-yellow", image: "/images/rangers-yellow.jpeg" },
+      { name: "Rangers-black", image: "/images/rangers-black.jpeg"},
+      { name: "Rangers", image: "/images/Rangers.jpeg"},
+      { name: "Commando-black", image: "/images/commando-black.jpeg"},
+
+    ]
+  },
+
+  
 ]

@@ -18,7 +18,7 @@ export default function Footer() {
               BIN<span className="text-orange-400">WATAN</span>
             </h2>
             <p className="text-sm leading-relaxed max-w-sm">
-              Redefining Pakistani craftsmanship. We bring you premium quality goods 
+              Redefining Pakistani Craftsmanship. We Bring you premium quality goods 
               that bridge the gap between tradition and modern durability.
             </p>
             <div className="flex items-center space-x-4">

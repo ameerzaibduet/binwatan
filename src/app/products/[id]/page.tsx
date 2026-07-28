@@ -23,7 +23,7 @@ type Props = {
   params: Promise<{ id: string }>
 }
 
-const bikeTypes = ["70cc", "110cc", "125cc", "150cc"]
+const bikeTypes = ["70cc", "110cc", "125cc", "150cc",  "100 Prider"]
 
 function getCompactBenefits(description: string) {
   const seen = new Set<string>()
