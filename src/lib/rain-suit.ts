@@ -6,12 +6,17 @@ export const RAIN_SUIT_SIZES = ["Small", "Medium", "Large"] as const
 export type RainSuitSize = (typeof RAIN_SUIT_SIZES)[number]
 
 export function isRainSuitProduct(product: Product) {
-  return product.category.toLowerCase() === "rain suites"
+  const category = product.category.toLowerCase().trim()
+
+  return (
+    category === "rain suites" ||
+    category === "ladies rain suit"
+  )
 }
 
 export function cartContainsRainSuit(cart: { id: string }[]) {
   return cart.some((item) => {
     const product = Products.find((p) => p.id === item.id)
-    return product && isRainSuitProduct(product)
+    return product ? isRainSuitProduct(product) : false
   })
 }
