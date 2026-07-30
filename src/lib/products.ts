@@ -733,7 +733,7 @@ Available in Small, Medium & Large`,
   {
     id: "31",
     name: "Ladies Rain Suit",
-    price: 1500,
+    price: 1470,
     image: "/images/Ladies-Rainsuit-Black.png",
     category: "Ladies Rain Suit",
     description: `Free delivery
@@ -751,7 +751,7 @@ Available in Small, Medium & Large`,
   {
     id: "32",
     name: "Ladies Rain Suit",
-    price: 1500,
+    price: 1470,
     image: "/images/Ladies-Rainsuit-Mehroon.jpeg",
     category: "Ladies Rain Suit",
     description: `Free delivery
@@ -770,7 +770,7 @@ Available in Small, Medium & Large`,
   {
     id: "33",
     name: "Ladies Rain Suit",
-    price: 1500,
+    price: 1470,
     image: "/images/Ladies-Rainsuit-Skyblue.jpeg",
     category: "Ladies Rain Suit",
     description: `Free delivery
