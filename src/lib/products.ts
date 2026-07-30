@@ -730,5 +730,60 @@ Available in Small, Medium & Large`,
     ]
   },
 
+  {
+    id: "31",
+    name: "Ladies Rain Suit",
+    price: 1500,
+    image: "/images/Ladies-Rainsuit-Black.png",
+    category: "Ladies Rain Suit",
+    description: `Free delivery
+Open parcel allowed
+100% waterproof
+Available in Small, Medium & Large`,
+    quantity: 1,
+    sizes: ["Small", "Medium", "Large"],
+    colors: [
+      { name: "Black", image: "/images/Ladies-Rainsuit-Black.png", default: true },
+      { name: "Mehroon", image: "/images/ladies-Rainsuit-Mehroon.png" },
+      { name: "Skyblue", image: "/images/ladies-Rainsuit-Skyblue.jpeg" },
+    ],
+  },
+  {
+    id: "32",
+    name: "Ladies Rain Suit",
+    price: 1500,
+    image: "/images/Ladies-Rainsuit-Mehroon.png",
+    category: "Ladies Rain Suit",
+    description: `Free delivery
+Open parcel allowed
+100% waterproof
+Available in Small, Medium & Large`,
+    quantity: 1,
+    sizes: ["Small", "Medium", "Large"],
+    colors: [
+      { name: "Mehroon", image: "/images/Ladies-Rainsuit-Mehroon.png", default: true },
+      { name: "Black", image: "/images/Ladies-Rainsuit-Black.png" },
+      { name: "Skyblue", image: "/images/Ladies-Rainsuit-Skyblue.jpeg" },
+    ],
+  },
+
+  {
+    id: "33",
+    name: "Ladies Rain Suit",
+    price: 1500,
+    image: "/images/Ladies-Rainsuit-Skyblue.jpeg",
+    category: "Ladies Rain Suit",
+    description: `Free delivery
+Open parcel allowed
+100% waterproof
+Available in Small, Medium & Large`,
+    quantity: 1,
+    sizes: ["Small", "Medium", "Large"],
+    colors: [
+      { name: "Skyblue", image: "/images/Ladies-Rainsuit-Skyblue.jpeg", default: true },
+      { name: "Black", image: "/images/Ladies-Rainsuit-Black.png" },
+      { name: "Mehroon", image: "/images/Ladies-Rainsuit-Mehroon.png" },
+    ],
+  },
   
 ]

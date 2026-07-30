@@ -23,10 +23,21 @@ export default function HomePage() {
       image: "/images/black-display.jpeg",
       href: "/category/parachute",
     },
+    
     {
       name: "Comando Covers",
       image: "/images/comando-black.jpeg",
       href: "/category/Comando%20Covers",
+    },
+     {
+      name: "Ladies Rain Suit",
+      image: "/images/Ladies-Rainsuit-Skyblue.jpeg",
+      href: "/category/Ladies%20Rain%20Suit",
+    },
+    {
+      name: "Rain Suites",
+      image: "/images/rain-suite-black.png",
+      href: "/category/Rain%20Suites",
     },
     {
       name: "Rexine",
@@ -38,11 +49,7 @@ export default function HomePage() {
       image: "/images/boolan-cover2.png",
       href: "/category/Car%20Top%20Cover",
     },
-    {
-      name: "Rain Suites",
-      image: "/images/rain-suite-black.png",
-      href: "/category/Rain%20Suites",
-    },
+   
   ]
 
   return (
