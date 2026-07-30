@@ -744,8 +744,8 @@ Available in Small, Medium & Large`,
     sizes: ["Small", "Medium", "Large"],
     colors: [
       { name: "Black", image: "/images/Ladies-Rainsuit-Black.png", default: true },
-      { name: "Mehroon", image: "/images/ladies-Rainsuit-Mehroon.jpeg" },
-      { name: "Skyblue", image: "/images/ladies-Rainsuit-Skyblue.jpeg" },
+      { name: "Mehroon", image: "/images/Ladies-Rainsuit-Mehroon.jpeg" },
+      { name: "Skyblue", image: "/images/Ladies-Rainsuit-Skyblue.jpeg" },
     ],
   },
   {
