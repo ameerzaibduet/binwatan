@@ -732,10 +732,10 @@ Available in Small, Medium & Large`,
 
   {
     id: "31",
-    name: "Ladies Rain Suit",
+    name: "Rain Coat",
     price: 1470,
     image: "/images/Ladies-Rainsuit-Black.png",
-    category: "Ladies Rain Suit",
+    category: "Rain Coat",
     description: `Free delivery
 Open parcel allowed
 100% waterproof
@@ -750,10 +750,10 @@ Available in Small, Medium & Large`,
   },
   {
     id: "32",
-    name: "Ladies Rain Suit",
+    name: "Rain Coat",
     price: 1470,
     image: "/images/Ladies-Rainsuit-Mehroon.jpeg",
-    category: "Ladies Rain Suit",
+    category: "Rain Coat",
     description: `Free delivery
 Open parcel allowed
 100% waterproof
@@ -769,10 +769,10 @@ Available in Small, Medium & Large`,
 
   {
     id: "33",
-    name: "Ladies Rain Suit",
+    name: "Rain Coat",
     price: 1470,
     image: "/images/Ladies-Rainsuit-Skyblue.jpeg",
-    category: "Ladies Rain Suit",
+    category: "Rain Coat",
     description: `Free delivery
 Open parcel allowed
 100% waterproof

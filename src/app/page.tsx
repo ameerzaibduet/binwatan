@@ -32,7 +32,7 @@ export default function HomePage() {
      {
       name: "Ladies Rain Suit",
       image: "/images/Ladies-Rainsuit-Skyblue.jpeg",
-      href: "/category/Ladies%20Rain%20Suit",
+      href: "/category/Rain%20Coat",
     },
     {
       name: "Rain Suites",

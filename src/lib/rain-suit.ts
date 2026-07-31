@@ -10,7 +10,7 @@ export function isRainSuitProduct(product: Product) {
 
   return (
     category === "rain suites" ||
-    category === "ladies rain suit"
+    category === "Rain Coat"
   )
 }
 
