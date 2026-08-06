@@ -235,7 +235,7 @@ export const Products: Product[] = [
     ]
   },
 
-  {
+ /* {
     id: "13",
     name: "Bolan Top Cover",
     price: 3250,
@@ -563,10 +563,10 @@ Open parcel allowed
     ]
   },
 
-  /* Rain Suites */
+  Rain Suites */
 
   {
-    id: "23",
+    id: "R1",
     name: "Rain Suit",
     price: 1500,
     image: "/images/rain-suite-black.png",
@@ -580,10 +580,12 @@ Available in Small, Medium & Large`,
     colors: [
       { name: "black", image: "/images/rain-suite-black.png", default: true },
       { name: "blue", image: "/images/rain-suite-blue.png" },
+      { name: "mahroon", image: "/images/rain-suite-mahroon.png" },
+      { name: "skyblue", image: "/images/rain-suite-skyblue.png" },
     ],
   },
   {
-    id: "24",
+    id: "R2",
     name: "Rain Suit",
     price: 1500,
     image: "/images/rain-suite-blue.png",
@@ -597,9 +599,55 @@ Available in Small, Medium & Large`,
     colors: [
       { name: "blue", image: "/images/rain-suite-blue.png", default: true },
       { name: "black", image: "/images/rain-suite-black.png" },
+      { name: "mahroon", image: "/images/rain-suite-mahroon.png" },
+      { name: "skyblue", image: "/images/rain-suite-skyblue.png" },
     ],
   },
-  
+  {
+    id: "R3",
+    name: "Rain Suit",
+    price: 1500,
+    image: "/images/rain-suite-mahroon.png",
+    category: "Rain Suites",
+    description: `Free delivery
+Open parcel allowed
+100% waterproof
+Available in Small, Medium & Large`,
+    quantity: 1,
+    sizes: ["Small", "Medium", "Large"],
+    colors: [
+      { name: "mahroon", image: "/images/rain-suite-mahroon.png", default: true },
+      { name: "black", image: "/images/rain-suite-black.png" },
+      { name: "blue", image: "/images/rain-suite-blue.png" },
+      { name: "skyblue", image: "/images/rain-suite-skyblue.png" },
+
+
+    ],
+  },
+
+  {
+    id: "R4",
+    name: "Rain Suit",
+    price: 1500,
+    image: "/images/rain-suite-skyblue.png",
+    category: "Rain Suites",
+    description: `Free delivery
+Open parcel allowed
+100% waterproof
+Available in Small, Medium & Large`,
+    quantity: 1,
+    sizes: ["Small", "Medium", "Large"],
+    colors: [
+      { name: "skyblue", image: "/images/rain-suite-skyblue.png", default: true },
+      { name: "black", image: "/images/rain-suite-black.png" },
+      { name: "blue", image: "/images/rain-suite-blue.png" },
+      { name: "mahroon", image: "/images/rain-suite-mahroon.png" },
+
+
+    ],
+  },
+
+
 
   {
     id: "25",
@@ -786,5 +834,7 @@ Available in Small, Medium & Large`,
     
     ],
   },
+
+
   
 ]
