@@ -5,36 +5,58 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { supabaseClient } from "@/utils/supabase/client"
 import LoadingSpinner from "@/components/ui/LoadingSpinner"
-import { Pencil, Trash2, Check, X, Package, Truck, Clock, LogOut, CaseUpper, LocateIcon, MessageCircle } from "lucide-react"
+import {
+  Pencil,
+  Trash2,
+  Check,
+  X,
+  Package,
+  Truck,
+  Clock,
+  LocateIcon,
+  MessageCircle,
+} from "lucide-react"
 import { useCourierProvider } from "@/hooks/useCourierProvider"
-import { getCustomerTrustLabel, type CustomerTrustLabel } from "@/lib/order-status"
+import {
+  getCustomerTrustLabel,
+  type CustomerTrustLabel,
+} from "@/lib/order-status"
 
 interface Order {
-  id: string;
-  customerName: string;
-  customerPhone: string;
-  deliveryAddress: string;
-  dispatched: boolean;
-  [key: string]: any;
+  id: string
+  customerName: string
+  customerPhone: string
+  deliveryAddress: string
+  dispatched: boolean
+  created_at?: string
+  [key: string]: any
 }
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<any[]>([])
   const [filteredOrders, setFilteredOrders] = useState<any[]>([])
   const [isAllowed, setIsAllowed] = useState(false)
-  const [filterStatus, setFilterStatus] = useState<"all" | "dispatched" | "pending">("pending")
+  const [filterStatus, setFilterStatus] = useState<
+    "all" | "dispatched" | "pending"
+  >("pending")
   const [loading, setLoading] = useState(true)
   const [editId, setEditId] = useState<string | null>(null)
   const [editedData, setEditedData] = useState<any>({})
-  const [popup, setPopup] = useState<{ type: "delete" | "dispatch"; id: string | null } | null>(null)
+  const [popup, setPopup] = useState<{
+    type: "delete" | "dispatch"
+    id: string | null
+  } | null>(null)
   const [status, setStatus] = useState<string | null>(null)
-  const [customerLabels, setCustomerLabels] = useState<Record<string, CustomerTrustLabel>>({})
+  const [customerLabels, setCustomerLabels] = useState<
+    Record<string, CustomerTrustLabel>
+  >({})
 
   const router = useRouter()
   const { provider } = useCourierProvider()
 
   useEffect(() => {
     const isAdmin = localStorage.getItem("isAdmin") === "true"
+
     if (!isAdmin) {
       router.replace("/admin/login")
     } else {
@@ -42,50 +64,70 @@ export default function AdminOrdersPage() {
       fetchOrders()
     }
   }, [])
-const openLocation = (order: any) => {
-  if (!order.latitude || !order.longitude) {
-    alert("No GPS location found for this order")
-    return
+
+  const openLocation = (order: any) => {
+    if (!order.latitude || !order.longitude) {
+      alert("No GPS location found for this order")
+      return
+    }
+
+    const url = `https://www.google.com/maps?q=${order.latitude},${order.longitude}`
+    window.open(url, "_blank")
   }
 
-  const url = `https://www.google.com/maps?q=${order.latitude},${order.longitude}`
-  window.open(url, "_blank")
-}
+  const formatWhatsappPhone = (phone: string) => {
+    const digits = String(phone || "").replace(/\D/g, "")
 
-const formatWhatsappPhone = (phone: string) => {
-  const digits = String(phone || "").replace(/\D/g, "")
-  if (!digits) return ""
-  if (digits.startsWith("92")) return digits
-  if (digits.startsWith("0")) return `92${digits.slice(1)}`
-  return digits
-}
+    if (!digits) return ""
+    if (digits.startsWith("92")) return digits
+    if (digits.startsWith("0")) return `92${digits.slice(1)}`
 
-const getWhatsappOrderDetails = (order: any) => {
-  const products =
-    order.items
-      ?.map((item: any) => {
-        const quantity = item.quantity && item.quantity > 1 ? ` x${item.quantity}` : ""
-        const color = item.color ? ` ${String(item.color).toUpperCase()}` : ""
-        return `${item.name}${quantity}${color}`
-      })
-      .join(", ") || "aap ka product"
-
-  return order.bike_specifications
-    ? `${products} ${order.bike_specifications}`
-    : products
-}
-
-const openWhatsappMessage = (order: any) => {
-  const phone = formatWhatsappPhone(order.phone)
-  if (!phone) {
-    alert("Customer phone number not found")
-    return
+    return digits
   }
 
-  const customerName = order.name || "customer"
-  const productDetails = getWhatsappOrderDetails(order)
-  const price = order.total || order.items?.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0) || ""
-  const message = `Assalam o Alaikum ${customerName},
+  const getWhatsappOrderDetails = (order: any) => {
+    const products =
+      order.items
+        ?.map((item: any) => {
+          const quantity =
+            item.quantity && item.quantity > 1
+              ? ` x${item.quantity}`
+              : ""
+
+          const color = item.color
+            ? ` ${String(item.color).toUpperCase()}`
+            : ""
+
+          return `${item.name}${quantity}${color}`
+        })
+        .join(", ") || "aap ka product"
+
+    return order.bike_specifications
+      ? `${products} ${order.bike_specifications}`
+      : products
+  }
+
+  const openWhatsappMessage = (order: any) => {
+    const phone = formatWhatsappPhone(order.phone)
+
+    if (!phone) {
+      alert("Customer phone number not found")
+      return
+    }
+
+    const customerName = order.name || "customer"
+    const productDetails = getWhatsappOrderDetails(order)
+
+    const price =
+      order.total ||
+      order.items?.reduce(
+        (sum: number, item: any) =>
+          sum + item.price * item.quantity,
+        0
+      ) ||
+      ""
+
+    const message = `Assalam o Alaikum ${customerName},
 
 *Order Confirmation*
 
@@ -98,21 +140,35 @@ Barah-e-karam apna address confirm kar dein ya apni location bhej dein, taake de
 
 Shukriya.`
 
-  window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank")
-}
+    window.open(
+      `https://wa.me/${phone}?text=${encodeURIComponent(message)}`,
+      "_blank"
+    )
+  }
 
   const recalculateOrderTotal = (items: any[] = []) =>
     items.reduce(
-      (sum, item) => sum + Number(item.price || 0) * Math.max(Number(item.quantity || 1), 1),
+      (sum, item) =>
+        sum +
+        Number(item.price || 0) *
+          Math.max(Number(item.quantity || 1), 1),
       0
     )
 
-  const updateEditedItem = (index: number, field: "color" | "quantity", value: string) => {
+  const updateEditedItem = (
+    index: number,
+    field: "color" | "quantity",
+    value: string
+  ) => {
     const nextItems = [...(editedData.items || [])]
     const currentItem = nextItems[index] || {}
+
     nextItems[index] = {
       ...currentItem,
-      [field]: field === "quantity" ? Math.max(Number(value || 1), 1) : value,
+      [field]:
+        field === "quantity"
+          ? Math.max(Number(value || 1), 1)
+          : value,
     }
 
     setEditedData({
@@ -122,56 +178,87 @@ Shukriya.`
     })
   }
 
-  const fetchOrders = async () => {
-  setStatus("Syncing with database...")
+  // Format created_at for display
+  const formatOrderDate = (date: string) => {
+    if (!date) return "-"
 
-  let allOrders: any[] = []
-  let from = 0
-  const batchSize = 1000
-  let finished = false
+    const parsedDate = new Date(date)
 
-  while (!finished) {
-    const { data, error } = await supabaseClient
-      .from("orders")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .range(from, from + batchSize - 1)
-
-    if (error) {
-      setStatus("Failed to load orders.")
-      console.error(error)
-      break
+    if (isNaN(parsedDate.getTime())) {
+      return "-"
     }
 
-    if (data && data.length > 0) {
-      allOrders = [...allOrders, ...data]
-      from += batchSize
+    return parsedDate.toLocaleString("en-PK", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  }
 
-      if (data.length < batchSize) {
+  const fetchOrders = async () => {
+    setStatus("Syncing with database...")
+
+    let allOrders: any[] = []
+    let from = 0
+    const batchSize = 1000
+    let finished = false
+
+    while (!finished) {
+      const { data, error } = await supabaseClient
+        .from("orders")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .range(from, from + batchSize - 1)
+
+      if (error) {
+        setStatus("Failed to load orders.")
+        console.error(error)
+        break
+      }
+
+      if (data && data.length > 0) {
+        allOrders = [...allOrders, ...data]
+        from += batchSize
+
+        if (data.length < batchSize) {
+          finished = true
+        }
+      } else {
         finished = true
       }
-    } else {
-      finished = true
     }
+
+    setOrders(allOrders)
+
+    const labels: Record<string, CustomerTrustLabel> = {}
+
+    for (const order of allOrders) {
+      labels[order.id] = getCustomerTrustLabel(
+        order.phone,
+        order.id,
+        allOrders
+      )
+    }
+
+    setCustomerLabels(labels)
+
+    const pending = allOrders.filter(
+      (o: Order) => !o.dispatched
+    )
+
+    setFilteredOrders(pending)
+    setFilterStatus("pending")
+
+    setStatus(null)
+    setLoading(false)
   }
 
-  setOrders(allOrders)
-
-  const labels: Record<string, CustomerTrustLabel> = {}
-  for (const order of allOrders) {
-    labels[order.id] = getCustomerTrustLabel(order.phone, order.id, allOrders)
-  }
-  setCustomerLabels(labels)
-
-  const pending = allOrders.filter((o: Order) => !o.dispatched)
-  setFilteredOrders(pending)
-  setFilterStatus("pending")
-
-  setStatus(null)
-  setLoading(false)
-}
-
-  const confirmAction = (type: "delete" | "dispatch", id: string) => {
+  const confirmAction = (
+    type: "delete" | "dispatch",
+    id: string
+  ) => {
     setPopup({ type, id })
   }
 
@@ -179,38 +266,73 @@ Shukriya.`
 
   const handleConfirm = async () => {
     if (!popup) return
+
     const { type, id } = popup
 
     if (type === "delete") {
       try {
         setStatus("Removing order...")
-        const { error } = await supabaseClient.from("orders").delete().eq("id", id!)
+
+        const { error } = await supabaseClient
+          .from("orders")
+          .delete()
+          .eq("id", id!)
+
         if (error) throw error
+
         await fetchOrders()
         setStatus("Order deleted.")
       } catch (err: any) {
+        console.error(err)
         setStatus("Delete failed.")
       }
     }
 
     if (type === "dispatch") {
-      setStatus(`Processing ${provider === "nextstep" ? "NextStep" : "PostEx"} booking...`)
+      setStatus(
+        `Processing ${
+          provider === "nextstep" ? "NextStep" : "PostEx"
+        } booking...`
+      )
+
       const order = orders.find((o) => o.id === id)
-      if (!order) return
+
+      if (!order) {
+        closePopup()
+        return
+      }
 
       try {
         const totalWeight = Math.max(
-          order.items?.reduce((sum: number, item: any) => sum + 0.3 * item.quantity, 0) || 0,
+          order.items?.reduce(
+            (sum: number, item: any) =>
+              sum + 0.3 * item.quantity,
+            0
+          ) || 0,
           0.5
         )
+
         const payload = {
           orderId: order.id,
-          orderRefNumber: order.id.slice(0, 8).toUpperCase(),
+          orderRefNumber: order.id
+            .slice(0, 8)
+            .toUpperCase(),
           invoicePayment: order.total,
-          orderDetail: order.items
-            ?.map((i: any) => `${i.name} x${i.quantity} | ${i.color.toUpperCase()} `)
-            .join(", ") + 
-            (order.bike_specifications ? `| Bike: ${order.bike_specifications}` : ""),          customerName: order.name,
+
+          orderDetail:
+            order.items
+              ?.map(
+                (i: any) =>
+                  `${i.name} x${i.quantity} | ${(
+                    i.color || ""
+                  ).toUpperCase()} `
+              )
+              .join(", ") +
+            (order.bike_specifications
+              ? `| Bike: ${order.bike_specifications}`
+              : ""),
+
+          customerName: order.name,
           customerPhone: order.phone,
           deliveryAddress: order.address,
           transactionNotes: "Allowed To Open",
@@ -223,26 +345,58 @@ Shukriya.`
         }
 
         const bookingEndpoint =
-          provider === "nextstep" ? "/api/nextstep/create" : "/api/postex/create"
+          provider === "nextstep"
+            ? "/api/nextstep/create"
+            : "/api/postex/create"
 
         const res = await fetch(bookingEndpoint, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+          },
           body: JSON.stringify(payload),
         })
 
         const data = await res.json()
 
         if (!res.ok || data.statusCode !== "200") {
-          setStatus(`Error: ${data.statusMessage || "Courier booking rejected"}`)
+          setStatus(
+            `Error: ${
+              data.statusMessage ||
+              "Courier booking rejected"
+            }`
+          )
+
           closePopup()
           return
         }
 
-        const trackingNumber = data.dist?.trackingNumber || "N/A"
+        const trackingNumber =
+          data.dist?.trackingNumber || "N/A"
 
-        setOrders((prev) => prev.map((o) => o.id === id ? { ...o, dispatched: true, tracking_number: trackingNumber } : o))
-        setFilteredOrders((prev) => prev.map((o) => o.id === id ? { ...o, dispatched: true, tracking_number: trackingNumber } : o))
+        setOrders((prev) =>
+          prev.map((o) =>
+            o.id === id
+              ? {
+                  ...o,
+                  dispatched: true,
+                  tracking_number: trackingNumber,
+                }
+              : o
+          )
+        )
+
+        setFilteredOrders((prev) =>
+          prev.map((o) =>
+            o.id === id
+              ? {
+                  ...o,
+                  dispatched: true,
+                  tracking_number: trackingNumber,
+                }
+              : o
+          )
+        )
 
         const updatePayload: Record<string, unknown> = {
           dispatched: true,
@@ -250,58 +404,99 @@ Shukriya.`
           courier_provider: provider,
         }
 
-        let { error: updateError } = await supabaseClient
-          .from("orders")
-          .update(updatePayload)
-          .eq("id", id!)
-
-        if (updateError?.message?.includes("courier_provider")) {
-          delete updatePayload.courier_provider
-          ;({ error: updateError } = await supabaseClient
+        let { error: updateError } =
+          await supabaseClient
             .from("orders")
             .update(updatePayload)
-            .eq("id", id!))
+            .eq("id", id!)
+
+        if (
+          updateError?.message?.includes(
+            "courier_provider"
+          )
+        ) {
+          delete updatePayload.courier_provider
+
+          ;({ error: updateError } =
+            await supabaseClient
+              .from("orders")
+              .update(updatePayload)
+              .eq("id", id!))
         }
 
         if (updateError) throw updateError
-        setStatus(`Success! Tracking: ${trackingNumber}`)
+
+        setStatus(
+          `Success! Tracking: ${trackingNumber}`
+        )
       } catch (err: any) {
+        console.error(err)
         setStatus("Booking failed.")
       }
     }
+
     closePopup()
   }
 
   const saveEdit = async () => {
     try {
       const updatedItems = editedData.items || []
+
       const updatePayload = {
         ...editedData,
         total: recalculateOrderTotal(updatedItems),
       }
 
-      const { error } = await supabaseClient.from("orders").update(updatePayload).eq("id", editId!)
+      const { error } = await supabaseClient
+        .from("orders")
+        .update(updatePayload)
+        .eq("id", editId!)
+
       if (error) throw error
+
       await fetchOrders()
+
       setEditId(null)
       setStatus("Update successful.")
     } catch (err: any) {
+      console.error(err)
       setStatus("Update failed.")
     }
   }
 
-  const handleFilter = (type: "all" | "dispatched" | "pending") => {
+  const handleFilter = (
+    type: "all" | "dispatched" | "pending"
+  ) => {
     setFilterStatus(type)
-    if (type === "all") setFilteredOrders(orders)
-    if (type === "dispatched") setFilteredOrders(orders.filter((o) => o.dispatched))
-    if (type === "pending") setFilteredOrders(orders.filter((o) => !o.dispatched))
+
+    if (type === "all") {
+      setFilteredOrders(orders)
+    }
+
+    if (type === "dispatched") {
+      setFilteredOrders(
+        orders.filter((o) => o.dispatched)
+      )
+    }
+
+    if (type === "pending") {
+      setFilteredOrders(
+        orders.filter((o) => !o.dispatched)
+      )
+    }
   }
 
-  if (loading) return <LoadingSpinner />
-  if (!isAllowed) return null
+  if (loading) {
+    return <LoadingSpinner />
+  }
+
+  if (!isAllowed) {
+    return null
+  }
 
   const trustBadge = (orderId: string) => {
     const label = customerLabels[orderId] || "new"
+
     if (label === "trusted") {
       return (
         <span className="rounded-full bg-emerald-600 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
@@ -309,6 +504,7 @@ Shukriya.`
         </span>
       )
     }
+
     if (label === "high-risk") {
       return (
         <span className="rounded-full bg-red-600 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
@@ -316,6 +512,7 @@ Shukriya.`
         </span>
       )
     }
+
     return (
       <span className="rounded-full bg-sky-600 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
         New Customer
@@ -324,205 +521,506 @@ Shukriya.`
   }
 
   return (
-    <div className="min-h-screen  text-zinc-100 font-sans selection:bg-orange-700/30">
+    <div className="min-h-screen text-zinc-100 font-sans selection:bg-orange-700/30">
       <div className="max-w-7xl mx-auto px-6 py-12">
-        
-       
 
+        {/* STATUS */}
         {status && (
           <div className="mb-6 py-3 px-4 bg-orange-700/10 border border-orange-700/50 text-orange-500 text-sm rounded-lg text-center animate-pulse">
             {status}
           </div>
         )}
 
-        {/* Stats Grid */}
+        {/* STATS */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-12">
           {[
-            { label: "Total", val: orders.length, type: "all", icon: Package, color: "zinc" },
-            { label: "Booked", val: orders.filter(o => o.dispatched).length, type: "dispatched", icon: Truck, color: "white" },
-            { label: "Pending", val: orders.filter(o => !o.dispatched).length, type: "pending", icon: Clock, color: "yellow" },
+            {
+              label: "Total",
+              val: orders.length,
+              type: "all",
+              icon: Package,
+              color: "zinc",
+            },
+            {
+              label: "Booked",
+              val: orders.filter(
+                (o) => o.dispatched
+              ).length,
+              type: "dispatched",
+              icon: Truck,
+              color: "white",
+            },
+            {
+              label: "Pending",
+              val: orders.filter(
+                (o) => !o.dispatched
+              ).length,
+              type: "pending",
+              icon: Clock,
+              color: "yellow",
+            },
           ].map((stat) => (
             <button
               key={stat.type}
-              onClick={() => handleFilter(stat.type as any)}
+              onClick={() =>
+                handleFilter(stat.type as any)
+              }
               className={`relative overflow-hidden p-6 rounded-2xl border-2 transition-all duration-300 text-left group ${
-                filterStatus === stat.type 
-                ? "border-orange-400 bg-orange-400 shadow-[0_0_20px_rgba(194,65,12,0.2)]" 
-                : "border-zinc-800 bg-black hover:border-zinc-700"
+                filterStatus === stat.type
+                  ? "border-orange-400 bg-orange-400 shadow-[0_0_20px_rgba(194,65,12,0.2)]"
+                  : "border-zinc-800 bg-black hover:border-zinc-700"
               }`}
             >
-              <stat.icon className={`w-10 h-10 mb-4 ${filterStatus === stat.type ? "text-white" : "text-zinc-700 group-hover:text-zinc-500"}`} />
-              <h2 className="text-zinc-500 uppercase text-xs font-bold tracking-widest">{stat.label}</h2>
-              <p className="text-3xl font-black mt-1">{stat.val}</p>
-              {filterStatus === stat.type && <div className="absolute top-0 right-0 p-2"><Check className="text-orange-700 w-5 h-5" /></div>}
+              <stat.icon
+                className={`w-10 h-10 mb-4 ${
+                  filterStatus === stat.type
+                    ? "text-white"
+                    : "text-zinc-700 group-hover:text-zinc-500"
+                }`}
+              />
+
+              <h2 className="text-zinc-500 uppercase text-xs font-bold tracking-widest">
+                {stat.label}
+              </h2>
+
+              <p className="text-3xl font-black mt-1">
+                {stat.val}
+              </p>
+
+              {filterStatus === stat.type && (
+                <div className="absolute top-0 right-0 p-2">
+                  <Check className="text-orange-700 w-5 h-5" />
+                </div>
+              )}
             </button>
           ))}
         </div>
 
-        {/* Orders List */}
+        {/* ORDERS */}
         {filteredOrders.length === 0 ? (
           <div className="text-center py-20 border-2 border-dashed border-zinc-800 rounded-3xl">
             <Package className="w-12 h-12 text-zinc-800 mx-auto mb-4" />
-            <p className="text-zinc-600">No records found in this category.</p>
+
+            <p className="text-zinc-600">
+              No records found in this category.
+            </p>
           </div>
         ) : (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+
             {filteredOrders.map((order) => (
-              <div key={order.id} className="group  border border-orange-700 rounded-2xl p-6 hover:border-orange-700/50 transition-all duration-300 shadow-xl">
-                
-                {/* Card Header */}
+              <div
+                key={order.id}
+                className="group border border-orange-700 rounded-2xl p-6 hover:border-orange-700/50 transition-all duration-300 shadow-xl"
+              >
+
+                {/* CARD HEADER */}
                 <div className="flex justify-between items-start mb-6">
+
                   <div className="flex-1">
+
                     {editId === order.id ? (
                       <input
-                        className=" border border-orange-700 rounded px-2 py-1 w-full text-blue-500 outline-none"
+                        className="border border-orange-700 rounded px-2 py-1 w-full text-blue-500 outline-none"
                         value={editedData.name}
-                        onChange={(e) => setEditedData({...editedData, name: e.target.value})}
+                        onChange={(e) =>
+                          setEditedData({
+                            ...editedData,
+                            name: e.target.value,
+                          })
+                        }
                       />
                     ) : (
                       <div>
-                        <h3 className="text-xl font-bold text-blue-500 group-hover:text-orange-500 transition-colors">{order.name}</h3>
-                        <div className="mt-2">{trustBadge(order.id)}</div>
+                        <h3 className="text-xl font-bold text-blue-500 group-hover:text-orange-500 transition-colors">
+                          {order.name}
+                        </h3>
+
+                        <div className="mt-2">
+                          {trustBadge(order.id)}
+                        </div>
                       </div>
                     )}
-                    <p className="text-[10px] text-zinc-500 font-mono mt-1 uppercase tracking-tighter">ID: {order.id.slice(0, 12)}...</p>
+
+                    {/* ORDER ID */}
+                    <p className="text-[10px] text-zinc-500 font-mono mt-2 uppercase tracking-tighter">
+                      ID: {order.id.slice(0, 12)}...
+                    </p>
+
+                    {/* ORDER DATE */}
+                    <p className="text-xs text-orange-500 font-semibold mt-2">
+                      Order Date:{" "}
+                      <span className="text-zinc-400">
+                        {formatOrderDate(
+                          order.created_at
+                        )}
+                      </span>
+                    </p>
+
                   </div>
-                  <div className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-tighter ${order.dispatched ? "bg-orange-700/20 text-orange-500" : "bg-red-700 text-white"}`}>
-                    {order.dispatched ? "Booked" : "Pending"}
+
+                  {/* STATUS */}
+                  <div
+                    className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-tighter ${
+                      order.dispatched
+                        ? "bg-orange-700/20 text-orange-500"
+                        : "bg-red-700 text-white"
+                    }`}
+                  >
+                    {order.dispatched
+                      ? "Booked"
+                      : "Pending"}
                   </div>
+
                 </div>
 
-                {/* Content */}
+                {/* CUSTOMER CONTENT */}
                 <div className="space-y-3 text-sm border-t border-zinc-800 pt-4">
+
+                  {/* PHONE */}
                   <div className="flex justify-between">
-                    
-                    <span className="text-black">Phone:</span>
-                    {editId === order.id ? 
-                      <input className="bg-zinc-800 text-right text-blue-500" value={editedData.phone} onChange={(e) => setEditedData({...editedData, phone: e.target.value})} /> 
-                      : <h2 className="text-blue-500 font-bold text-[20px] ">{order.phone}</h2>
-                    }
+
+                    <span className="text-black">
+                      Phone:
+                    </span>
+
+                    {editId === order.id ? (
+                      <input
+                        className="bg-zinc-800 text-right text-blue-500"
+                        value={editedData.phone}
+                        onChange={(e) =>
+                          setEditedData({
+                            ...editedData,
+                            phone: e.target.value,
+                          })
+                        }
+                      />
+                    ) : (
+                      <h2 className="text-blue-500 font-bold text-[20px]">
+                        {order.phone}
+                      </h2>
+                    )}
+
                   </div>
+
+                  {/* ADDRESS */}
                   <div className="flex flex-col">
-                    <span className="text-zinc-500 mb-1">Shipping Address:</span>
-                    {editId === order.id ? 
+
+                    <span className="text-zinc-500 mb-1">
+                      Shipping Address:
+                    </span>
+
+                    {editId === order.id ? (
                       <div className="space-y-2">
-                        <textarea className="bg-zinc-800 text-orange-500 text-xs p-2 rounded" value={editedData.address || ""} onChange={(e) => setEditedData({...editedData, address: e.target.value})} />
+
+                        <textarea
+                          className="bg-zinc-800 text-orange-500 text-xs p-2 rounded"
+                          value={
+                            editedData.address || ""
+                          }
+                          onChange={(e) =>
+                            setEditedData({
+                              ...editedData,
+                              address: e.target.value,
+                            })
+                          }
+                        />
+
                         <input
                           className="bg-zinc-800 text-orange-500 text-xs p-2 rounded"
-                          value={editedData.city || ""}
-                          onChange={(e) => setEditedData({...editedData, city: e.target.value})}
+                          value={
+                            editedData.city || ""
+                          }
+                          onChange={(e) =>
+                            setEditedData({
+                              ...editedData,
+                              city: e.target.value,
+                            })
+                          }
                           placeholder="City"
                         />
+
                       </div>
-                      : <span className="text-black leading-snug">{order.address}, <span className="text-orange-700">{order.city}</span></span>
-                    }
+                    ) : (
+                      <span className="text-black leading-snug">
+                        {order.address},{" "}
+                        <span className="text-orange-700">
+                          {order.city}
+                        </span>
+                      </span>
+                    )}
+
                   </div>
+
+                  {/* LOCATION / WHATSAPP */}
                   <div className="mt-2 grid grid-cols-2 gap-2">
+
                     <Button
                       className="bg-green-600 hover:bg-green-700 text-white"
-                      onClick={() => openLocation(order)}
+                      onClick={() =>
+                        openLocation(order)
+                      }
                     >
                       <LocateIcon className="w-4 h-4 mr-2" />
                       Location
                     </Button>
+
                     <Button
                       className="bg-green-600 hover:bg-green-700 text-white"
-                      onClick={() => openWhatsappMessage(order)}
+                      onClick={() =>
+                        openWhatsappMessage(order)
+                      }
                     >
                       <MessageCircle className="w-4 h-4 mr-2" />
                       WhatsApp
                     </Button>
+
                   </div>
-                    
+
                 </div>
 
-                {/* Items */}
-                <div className="mt-6 border  rounded-xl p-4">
-                  <p className="text-[10px] font-bold text-zinc-600 uppercase mb-3 tracking-widest">Manifest</p>
+                {/* MANIFEST */}
+                <div className="mt-6 border rounded-xl p-4">
+
+                  <p className="text-[10px] font-bold text-zinc-600 uppercase mb-3 tracking-widest">
+                    Manifest
+                  </p>
+
                   <ul className="space-y-2">
-                    {order.items?.map((item: any, i: number) => (
-                      <li key={i} className="flex justify-between gap-3 text-xs border-b border-zinc-800/50 pb-2">
-                        {editId === order.id ? (
-                          <div className="grid flex-1 grid-cols-[1fr_70px_90px] gap-2">
-                            <span className="text-black">{item.name}</span>
-                            <input
-                              className="rounded bg-zinc-800 px-2 py-1 text-blue-500"
-                              min={1}
-                              type="number"
-                              value={editedData.items?.[i]?.quantity ?? item.quantity}
-                              onChange={(e) => updateEditedItem(i, "quantity", e.target.value)}
-                            />
-                            <input
-                              className="rounded bg-zinc-800 px-2 py-1 text-blue-500"
-                              value={editedData.items?.[i]?.color ?? item.color ?? ""}
-                              onChange={(e) => updateEditedItem(i, "color", e.target.value)}
-                              placeholder="Color"
-                            />
-                          </div>
-                        ) : (
-                          <span className="text-black">{item.name} <span className="text-blue-500 font-bold">x{item.quantity} <span className="text-black"> {order.bike_specifications}</span></span> {item.color.toUpperCase()}</span>
-                        )}
 
-                        <span className="text-black">PKR {item.price * item.quantity}</span>
-                      </li>
-                    ))}
+                    {order.items?.map(
+                      (item: any, i: number) => (
+                        <li
+                          key={i}
+                          className="flex justify-between gap-3 text-xs border-b border-zinc-800/50 pb-2"
+                        >
+
+                          {editId === order.id ? (
+                            <div className="grid flex-1 grid-cols-[1fr_70px_90px] gap-2">
+
+                              <span className="text-black">
+                                {item.name}
+                              </span>
+
+                              <input
+                                className="rounded bg-zinc-800 px-2 py-1 text-blue-500"
+                                min={1}
+                                type="number"
+                                value={
+                                  editedData.items?.[i]
+                                    ?.quantity ??
+                                  item.quantity
+                                }
+                                onChange={(e) =>
+                                  updateEditedItem(
+                                    i,
+                                    "quantity",
+                                    e.target.value
+                                  )
+                                }
+                              />
+
+                              <input
+                                className="rounded bg-zinc-800 px-2 py-1 text-blue-500"
+                                value={
+                                  editedData.items?.[i]
+                                    ?.color ??
+                                  item.color ??
+                                  ""
+                                }
+                                onChange={(e) =>
+                                  updateEditedItem(
+                                    i,
+                                    "color",
+                                    e.target.value
+                                  )
+                                }
+                                placeholder="Color"
+                              />
+
+                            </div>
+                          ) : (
+                            <span className="text-black">
+
+                              {item.name}{" "}
+
+                              <span className="text-blue-500 font-bold">
+                                x{item.quantity}{" "}
+
+                                <span className="text-black">
+                                  {order.bike_specifications}
+                                </span>
+                              </span>{" "}
+
+                              {item.color?.toUpperCase()}
+
+                            </span>
+                          )}
+
+                          <span className="text-black whitespace-nowrap">
+                            PKR{" "}
+                            {item.price *
+                              item.quantity}
+                          </span>
+
+                        </li>
+                      )
+                    )}
+
                   </ul>
+
+                  {/* TOTAL */}
                   <div className="flex justify-between items-center mt-4 pt-2 border-t border-orange-700/30">
-                    <span className="text-xs font-bold text-orange-700">TOTAL</span>
-                    <span className="text-lg font-black text-blue-500">Rs. {order.total}</span>
+
+                    <span className="text-xs font-bold text-orange-700">
+                      TOTAL
+                    </span>
+
+                    <span className="text-lg font-black text-blue-500">
+                      Rs. {order.total}
+                    </span>
+
                   </div>
+
                 </div>
 
-                {/* Actions */}
+                {/* ACTIONS */}
                 <div className="flex gap-2 mt-6">
+
                   {editId === order.id ? (
                     <>
-                      <Button className="flex-1 bg-orange-700 hover:bg-orange-800 text-white" onClick={saveEdit}><Check className="w-4 h-4" /></Button>
-                      <Button variant="outline" className="flex-1 border-zinc-700 text-zinc-400" onClick={() => setEditId(null)}><X className="w-4 h-4" /></Button>
+                      <Button
+                        className="flex-1 bg-orange-700 hover:bg-orange-800 text-white"
+                        onClick={saveEdit}
+                      >
+                        <Check className="w-4 h-4" />
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        className="flex-1 border-zinc-700 text-zinc-400"
+                        onClick={() =>
+                          setEditId(null)
+                        }
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
                     </>
                   ) : (
                     <>
-                      <Button variant="outline" className="bg-white  text-zinc-800 hover:text-orange-400" onClick={() => { setEditId(order.id); setEditedData(order); }}>
+                      {/* EDIT */}
+                      <Button
+                        variant="outline"
+                        className="bg-white text-zinc-800 hover:text-orange-400"
+                        onClick={() => {
+                          setEditId(order.id)
+                          setEditedData(order)
+                        }}
+                      >
                         <Pencil className="w-4 h-4" />
                       </Button>
-                      <Button 
-                        className={`flex-1 font-bold uppercase text-[10px] tracking-widest transition-all ${order.dispatched ? "bg-white text-zinc-500 cursor-not-allowed" : "bg-orange-400 hover:bg-orange-600 text-white"}`}
-                        onClick={() => !order.dispatched && confirmAction("dispatch", order.id)}
+
+                      {/* BOOK SHIPMENT */}
+                      <Button
+                        className={`flex-1 font-bold uppercase text-[10px] tracking-widest transition-all ${
+                          order.dispatched
+                            ? "bg-white text-zinc-500 cursor-not-allowed"
+                            : "bg-orange-400 hover:bg-orange-600 text-white"
+                        }`}
+                        onClick={() =>
+                          !order.dispatched &&
+                          confirmAction(
+                            "dispatch",
+                            order.id
+                          )
+                        }
                         disabled={order.dispatched}
                       >
-                        {order.dispatched ? "Dispatched" : "Book Shipment"}
+                        {order.dispatched
+                          ? "Dispatched"
+                          : "Book Shipment"}
                       </Button>
-                      <Button variant="destructive" className="bg-white hover:bg-red-900/40 text-red-500 border border-red-900/20" onClick={() => confirmAction("delete", order.id)}>
+
+                      {/* DELETE */}
+                      <Button
+                        variant="destructive"
+                        className="bg-white hover:bg-red-900/40 text-red-500 border border-red-900/20"
+                        onClick={() =>
+                          confirmAction(
+                            "delete",
+                            order.id
+                          )
+                        }
+                      >
                         <Trash2 className="w-4 h-4" />
                       </Button>
                     </>
                   )}
+
                 </div>
+
               </div>
             ))}
+
           </div>
         )}
 
-        {/* Popups */}
+        {/* CONFIRMATION POPUP */}
         {popup && (
           <div className="fixed inset-0 bg-zinc-950/90 backdrop-blur-sm flex justify-center items-center z-50 p-6">
+
             <div className="bg-zinc-900 border border-orange-700/50 p-8 rounded-3xl max-w-sm w-full text-center shadow-2xl">
+
               <div className="w-16 h-16 bg-orange-700/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                {popup.type === 'delete' ? <Trash2 className="text-orange-700 w-8 h-8" /> : <Truck className="text-orange-700 w-8 h-8" />}
+
+                {popup.type === "delete" ? (
+                  <Trash2 className="text-orange-700 w-8 h-8" />
+                ) : (
+                  <Truck className="text-orange-700 w-8 h-8" />
+                )}
+
               </div>
-              <h2 className="text-xl font-bold text-white mb-2">Confirm Action</h2>
+
+              <h2 className="text-xl font-bold text-white mb-2">
+                Confirm Action
+              </h2>
+
               <p className="text-zinc-500 text-sm mb-8 leading-relaxed">
-                {popup.type === "delete" 
-                  ? "Are you sure you want to permanently remove this order from the database? This cannot be undone." 
-                  : `Proceed with ${provider === "nextstep" ? "NextStep" : "PostEx"} booking? This will generate a tracking number and mark as dispatched.`}
+
+                {popup.type === "delete"
+                  ? "Are you sure you want to permanently remove this order from the database? This cannot be undone."
+                  : `Proceed with ${
+                      provider === "nextstep"
+                        ? "NextStep"
+                        : "PostEx"
+                    } booking? This will generate a tracking number and mark as dispatched.`}
+
               </p>
+
               <div className="grid grid-cols-2 gap-3">
-                <Button className="bg-orange-700 hover:bg-orange-800 text-white font-bold" onClick={handleConfirm}>Confirm</Button>
-                <Button variant="outline" className="border-zinc-800 text-zinc-400" onClick={closePopup}>Cancel</Button>
+
+                <Button
+                  className="bg-orange-700 hover:bg-orange-800 text-white font-bold"
+                  onClick={handleConfirm}
+                >
+                  Confirm
+                </Button>
+
+                <Button
+                  variant="outline"
+                  className="border-zinc-800 text-zinc-400"
+                  onClick={closePopup}
+                >
+                  Cancel
+                </Button>
+
               </div>
+
             </div>
+
           </div>
         )}
+
       </div>
     </div>
   )
