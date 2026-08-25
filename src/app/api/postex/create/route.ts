@@ -35,7 +35,36 @@ export async function POST(request: Request) {
       pickupAddress: body.pickupAddress || "House # 44 5/f1 Orangi Town Karachi",
     }
 
-    console.log("📦 Sending payload to PostEx:", payload)
+    // Select which PostEx account token to sign this booking with.
+    // Rain Suit / Rain Coat orders are flagged by the frontend with
+    // accountKey: "KHAN_ZAIB" and must always book through that
+    // dedicated PostEx account, independent of the default token.
+    const postexToken =
+      body.accountKey === "KHAN_ZAIB"
+        ? process.env.POSTEX_TOKEN_KHAN_ZAIB
+        : process.env.POSTEX_API_TOKEN
+
+    if (!postexToken) {
+      const missingVar =
+        body.accountKey === "KHAN_ZAIB"
+          ? "POSTEX_TOKEN_KHAN_ZAIB"
+          : "POSTEX_API_TOKEN"
+
+      console.error(`❌ Missing PostEx token env var: ${missingVar}`)
+
+      return NextResponse.json(
+        {
+          statusCode: "500",
+          statusMessage: `Server misconfigured: ${missingVar} is not set`,
+        },
+        { status: 500 }
+      )
+    }
+
+    console.log(
+      `📦 Sending payload to PostEx [account: ${body.accountKey === "KHAN_ZAIB" ? "KHAN_ZAIB" : "default"}]:`,
+      payload
+    )
 
     // Call PostEx API
     const response = await axios.post(
@@ -44,7 +73,7 @@ export async function POST(request: Request) {
       {
         headers: {
           "Content-Type": "application/json",
-          token: process.env.POSTEX_API_TOKEN || "",
+          token: postexToken,
         },
       }
     )

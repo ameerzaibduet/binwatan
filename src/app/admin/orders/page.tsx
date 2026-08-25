@@ -15,6 +15,7 @@ import {
   Clock,
   LocateIcon,
   MessageCircle,
+  Loader2,
 } from "lucide-react"
 import { useCourierProvider } from "@/hooks/useCourierProvider"
 import {
@@ -30,6 +31,26 @@ interface Order {
   dispatched: boolean
   created_at?: string
   [key: string]: any
+}
+
+// Categories that must always ship via PostEx, using the
+// dedicated Khan Zaib PostEx account, regardless of the
+// currently selected courier provider.
+const RAIN_CATEGORIES = ["rain suit", "rain coat"]
+
+// Checks each item's `category` field (falls back to `name`
+// if `category` isn't present) to see if this order contains
+// a rain suit / rain coat product.
+const isRainCategoryOrder = (order: any) => {
+  return (order.items || []).some((item: any) => {
+    const label = String(
+      item.category || item.name || ""
+    ).toLowerCase()
+
+    return RAIN_CATEGORIES.some((rainType) =>
+      label.includes(rainType)
+    )
+  })
 }
 
 export default function AdminOrdersPage() {
@@ -50,6 +71,9 @@ export default function AdminOrdersPage() {
   const [customerLabels, setCustomerLabels] = useState<
     Record<string, CustomerTrustLabel>
   >({})
+  // Tracks whether the Confirm button in the popup has been
+  // clicked and we're still waiting on the booking/delete call.
+  const [isConfirming, setIsConfirming] = useState(false)
 
   const router = useRouter()
   const { provider } = useCourierProvider()
@@ -262,10 +286,18 @@ Shukriya.`
     setPopup({ type, id })
   }
 
-  const closePopup = () => setPopup(null)
+  const closePopup = () => {
+    setPopup(null)
+    setIsConfirming(false)
+  }
 
   const handleConfirm = async () => {
     if (!popup) return
+
+    // Flip the button into its loading state immediately so the
+    // admin gets feedback that the click registered, before any
+    // network call has even started.
+    setIsConfirming(true)
 
     const { type, id } = popup
 
@@ -289,18 +321,31 @@ Shukriya.`
     }
 
     if (type === "dispatch") {
-      setStatus(
-        `Processing ${
-          provider === "nextstep" ? "NextStep" : "PostEx"
-        } booking...`
-      )
-
       const order = orders.find((o) => o.id === id)
 
       if (!order) {
         closePopup()
         return
       }
+
+      // Rain Suit / Rain Coat orders always go through PostEx,
+      // using the dedicated Khan Zaib PostEx account — this
+      // overrides whatever provider is currently selected in
+      // the courier toggle.
+      const forcePostexRainAccount = isRainCategoryOrder(order)
+      const effectiveProvider = forcePostexRainAccount
+        ? "postex"
+        : provider
+
+      setStatus(
+        forcePostexRainAccount
+          ? "Processing PostEx (Khan Zaib account) booking..."
+          : `Processing ${
+              effectiveProvider === "nextstep"
+                ? "NextStep"
+                : "PostEx"
+            } booking...`
+      )
 
       try {
         const totalWeight = Math.max(
@@ -342,10 +387,18 @@ Shukriya.`
           orderType: "Normal",
           pickupAddressCode: "001",
           weight: totalWeight,
+
+          // Tells /api/postex/create which token to sign the
+          // booking with. The route should read this and use
+          // process.env.POSTEX_TOKEN_KHAN_ZAIB when present,
+          // falling back to the default PostEx token otherwise.
+          ...(forcePostexRainAccount
+            ? { accountKey: "KHAN_ZAIB" }
+            : {}),
         }
 
         const bookingEndpoint =
-          provider === "nextstep"
+          effectiveProvider === "nextstep"
             ? "/api/nextstep/create"
             : "/api/postex/create"
 
@@ -401,7 +454,7 @@ Shukriya.`
         const updatePayload: Record<string, unknown> = {
           dispatched: true,
           tracking_number: trackingNumber,
-          courier_provider: provider,
+          courier_provider: effectiveProvider,
         }
 
         let { error: updateError } =
@@ -1000,16 +1053,25 @@ Shukriya.`
               <div className="grid grid-cols-2 gap-3">
 
                 <Button
-                  className="bg-orange-700 hover:bg-orange-800 text-white font-bold"
+                  className="bg-orange-700 hover:bg-orange-800 text-white font-bold disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   onClick={handleConfirm}
+                  disabled={isConfirming}
                 >
-                  Confirm
+                  {isConfirming ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Please wait...
+                    </>
+                  ) : (
+                    "Confirm"
+                  )}
                 </Button>
 
                 <Button
                   variant="outline"
-                  className="border-zinc-800 text-zinc-400"
+                  className="border-zinc-800 text-zinc-400 disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={closePopup}
+                  disabled={isConfirming}
                 >
                   Cancel
                 </Button>
