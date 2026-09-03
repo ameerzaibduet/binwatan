@@ -181,7 +181,7 @@ Shukriya.`
 
   const updateEditedItem = (
     index: number,
-    field: "color" | "quantity",
+    field: "color" | "quantity" | "price",
     value: string
   ) => {
     const nextItems = [...(editedData.items || [])]
@@ -192,8 +192,25 @@ Shukriya.`
       [field]:
         field === "quantity"
           ? Math.max(Number(value || 1), 1)
+          : field === "price"
+          ? Math.max(Number(value || 0), 0)
           : value,
     }
+
+    setEditedData({
+      ...editedData,
+      items: nextItems,
+      total: recalculateOrderTotal(nextItems),
+    })
+  }
+
+  // Removes a single line item from the order being edited
+  // (e.g. the customer cancelled one product out of a
+  // multi-item order) and recalculates the total.
+  const removeEditedItem = (index: number) => {
+    const nextItems = (editedData.items || []).filter(
+      (_: any, i: number) => i !== index
+    )
 
     setEditedData({
       ...editedData,
@@ -841,17 +858,21 @@ Shukriya.`
 
                   <ul className="space-y-2">
 
-                    {order.items?.map(
-                      (item: any, i: number) => (
-                        <li
-                          key={i}
-                          className="flex justify-between gap-3 text-xs border-b border-zinc-800/50 pb-2"
-                        >
+                    {(editId === order.id
+                      ? editedData.items || []
+                      : order.items || []
+                    ).map((item: any, i: number) => (
+                      <li
+                        key={i}
+                        className="flex justify-between gap-3 text-xs border-b border-zinc-800/50 pb-2"
+                      >
 
-                          {editId === order.id ? (
-                            <div className="grid flex-1 grid-cols-[1fr_70px_90px] gap-2">
+                        {editId === order.id ? (
+                          <div className="flex flex-1 items-center gap-2">
 
-                              <span className="text-black">
+                            <div className="grid flex-1 grid-cols-[1fr_55px_65px_70px] gap-2">
+
+                              <span className="text-black self-center truncate">
                                 {item.name}
                               </span>
 
@@ -859,11 +880,7 @@ Shukriya.`
                                 className="rounded bg-zinc-800 px-2 py-1 text-blue-500"
                                 min={1}
                                 type="number"
-                                value={
-                                  editedData.items?.[i]
-                                    ?.quantity ??
-                                  item.quantity
-                                }
+                                value={item.quantity}
                                 onChange={(e) =>
                                   updateEditedItem(
                                     i,
@@ -875,12 +892,7 @@ Shukriya.`
 
                               <input
                                 className="rounded bg-zinc-800 px-2 py-1 text-blue-500"
-                                value={
-                                  editedData.items?.[i]
-                                    ?.color ??
-                                  item.color ??
-                                  ""
-                                }
+                                value={item.color || ""}
                                 onChange={(e) =>
                                   updateEditedItem(
                                     i,
@@ -891,8 +903,37 @@ Shukriya.`
                                 placeholder="Color"
                               />
 
+                              <input
+                                className="rounded bg-zinc-800 px-2 py-1 text-blue-500"
+                                min={0}
+                                type="number"
+                                value={item.price}
+                                onChange={(e) =>
+                                  updateEditedItem(
+                                    i,
+                                    "price",
+                                    e.target.value
+                                  )
+                                }
+                                placeholder="Price"
+                              />
+
                             </div>
-                          ) : (
+
+                            <button
+                              type="button"
+                              className="shrink-0 text-red-500 hover:text-red-400"
+                              onClick={() =>
+                                removeEditedItem(i)
+                              }
+                              title="Remove item"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+
+                          </div>
+                        ) : (
+                          <>
                             <span className="text-black">
 
                               {item.name}{" "}
@@ -908,17 +949,17 @@ Shukriya.`
                               {item.color?.toUpperCase()}
 
                             </span>
-                          )}
 
-                          <span className="text-black whitespace-nowrap">
-                            PKR{" "}
-                            {item.price *
-                              item.quantity}
-                          </span>
+                            <span className="text-black whitespace-nowrap">
+                              PKR{" "}
+                              {item.price *
+                                item.quantity}
+                            </span>
+                          </>
+                        )}
 
-                        </li>
-                      )
-                    )}
+                      </li>
+                    ))}
 
                   </ul>
 
@@ -930,7 +971,10 @@ Shukriya.`
                     </span>
 
                     <span className="text-lg font-black text-blue-500">
-                      Rs. {order.total}
+                      Rs.{" "}
+                      {editId === order.id
+                        ? editedData.total ?? order.total
+                        : order.total}
                     </span>
 
                   </div>
