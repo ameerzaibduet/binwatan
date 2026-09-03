@@ -566,9 +566,9 @@ Open parcel allowed
   Rain Suites */
 
   {
-    id: "R3",
+    id: "R1",
     name: "Rain Suit",
-    price: 1699,
+    price: 1500,
     image: "/images/rain-suite-black2.png",
     category: "Rain Suites",
     description: `Free delivery
@@ -589,7 +589,7 @@ Available in Small, Medium, Large & Extra Large`,
   {
     id: "R2",
     name: "Rain Suit",
-    price: 1699,
+    price: 1500,
     image: "/images/rain-suite-blue2.png",
     category: "Rain Suites",
     description: `Free delivery
@@ -608,9 +608,9 @@ Available in Small, Medium, Large & Extra Large`,
     ],
   },
   {
-    id: "R1",
+    id: "R3",
     name: "Rain Suit",
-    price: 1699,
+    price: 1500,
     image: "/images/rain-suite-mahroon.png",
     category: "Rain Suites",
     description: `Free delivery
@@ -633,7 +633,7 @@ Available in Small, Medium, Large & Extra Large`,
   {
     id: "R4",
     name: "Rain Suit",
-    price: 1699,
+    price: 1500,
     image: "/images/rain-suite-green.png",
     category: "Rain Suites",
     description: `Free delivery
@@ -660,7 +660,7 @@ Available in Small, Medium, Large & Extra Large`,
   {
     id: "R5",
     name: "Rain Suit",
-    price: 1699,
+    price: 1500,
     image: "/images/rain-suite-skyblue.png",
     category: "Rain Suites",
     description: `Free delivery
@@ -671,8 +671,8 @@ Available in Small, Medium, Large & Extra Large`,
     sizes: ["Small", "Medium", "Large", "Extra Large"],
     colors: [
       { name: "skyblue", image: "/images/rain-suite-skyblue.png", default: true },
-      { name: "black", image: "/images/rain-suite-black.png" },
-      { name: "blue", image: "/images/rain-suite-blue.png" },
+      { name: "black", image: "/images/rain-suite-black2.png" },
+      { name: "blue", image: "/images/rain-suite-blue2.png" },
       { name: "mahroon", image: "/images/rain-suite-mahroon.png" },
       { name: "green", image: "/images/rain-suite-green.png" },
 
