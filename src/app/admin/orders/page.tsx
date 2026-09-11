@@ -1,1133 +1,2477 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
+import { useEffect, useMemo, useState } from "react"
 import { supabaseClient } from "@/utils/supabase/client"
-import LoadingSpinner from "@/components/ui/LoadingSpinner"
 import {
-  Pencil,
-  Trash2,
-  Check,
-  X,
+  Search,
+  RefreshCw,
   Package,
+  CheckCircle2,
+  Clock3,
   Truck,
-  Clock,
-  LocateIcon,
-  MessageCircle,
+  Trash2,
+  Pencil,
+  X,
+  Save,
+  MapPin,
+  Phone,
+  User,
+  CalendarDays,
+  ExternalLink,
+  AlertCircle,
   Loader2,
+  Ban,
 } from "lucide-react"
-import { useCourierProvider } from "@/hooks/useCourierProvider"
-import {
-  getCustomerTrustLabel,
-  type CustomerTrustLabel,
-} from "@/lib/order-status"
 
-interface Order {
-  id: string
-  customerName: string
-  customerPhone: string
-  deliveryAddress: string
-  dispatched: boolean
-  created_at?: string
-  [key: string]: any
+type OrderStatus =
+  | "pending"
+  | "confirmed"
+  | "cancelled"
+
+type OrderItem = {
+  id?: string
+  name?: string
+  price?: number
+  quantity?: number
+  color?: string | null
+  size?: string | null
+  image?: string | null
+  category?: string | null
 }
 
-// Categories that must always ship via PostEx, using the
-// dedicated Khan Zaib PostEx account, regardless of the
-// currently selected courier provider.
-const RAIN_CATEGORIES = ["rain suit", "rain coat"]
+type Order = {
+  id: string
+  name: string
+  phone: string
+  email?: string | null
+  city: string
+  address: string
+  items: OrderItem[]
+  total: number
+  dispatched: boolean
 
-// Checks each item's `category` field (falls back to `name`
-// if `category` isn't present) to see if this order contains
-// a rain suit / rain coat product.
-const isRainCategoryOrder = (order: any) => {
-  return (order.items || []).some((item: any) => {
-    const label = String(
-      item.category || item.name || ""
-    ).toLowerCase()
+  order_status?: OrderStatus | null
 
-    return RAIN_CATEGORIES.some((rainType) =>
-      label.includes(rainType)
+  created_at: string
+
+  tracking_number?: string | null
+  courier_provider?: string | null
+
+  transaction_status?: string | null
+  transaction_notes?: string | null
+
+  bike_specifications?: string | null
+
+  delivery_date?: string | null
+  pickup_date?: string | null
+
+  latitude?: number | null
+  longitude?: number | null
+}
+
+type FilterStatus =
+  | "all"
+  | "pending"
+  | "confirmed"
+  | "cancelled"
+  | "dispatched"
+
+const PAGE_SIZE = 20
+
+const RAIN_CATEGORIES = [
+  "rain suit",
+  "rain coat",
+]
+
+function isRainCategoryOrder(order: Order) {
+  return order.items?.some((item) => {
+    const category = String(item.category || "").toLowerCase()
+    const name = String(item.name || "").toLowerCase()
+
+    return RAIN_CATEGORIES.some(
+      (rainCategory) =>
+        category.includes(rainCategory) ||
+        name.includes(rainCategory)
     )
   })
 }
 
-export default function AdminOrdersPage() {
-  const [orders, setOrders] = useState<any[]>([])
-  const [filteredOrders, setFilteredOrders] = useState<any[]>([])
-  const [isAllowed, setIsAllowed] = useState(false)
-  const [filterStatus, setFilterStatus] = useState<
-    "all" | "dispatched" | "pending"
-  >("pending")
-  const [loading, setLoading] = useState(true)
-  const [editId, setEditId] = useState<string | null>(null)
-  const [editedData, setEditedData] = useState<any>({})
-  const [popup, setPopup] = useState<{
-    type: "delete" | "dispatch"
-    id: string | null
-  } | null>(null)
-  const [status, setStatus] = useState<string | null>(null)
-  const [customerLabels, setCustomerLabels] = useState<
-    Record<string, CustomerTrustLabel>
-  >({})
-  // Tracks whether the Confirm button in the popup has been
-  // clicked and we're still waiting on the booking/delete call.
-  const [isConfirming, setIsConfirming] = useState(false)
+function getOrderStatus(order: Order): OrderStatus {
+  if (order.order_status === "confirmed") {
+    return "confirmed"
+  }
 
-  const router = useRouter()
-  const { provider } = useCourierProvider()
+  if (order.order_status === "cancelled") {
+    return "cancelled"
+  }
+
+  return "pending"
+}
+
+function getStatusLabel(order: Order) {
+  if (order.dispatched) {
+    return "Dispatched"
+  }
+
+  const status = getOrderStatus(order)
+
+  if (status === "confirmed") {
+    return "Confirmed"
+  }
+
+  if (status === "cancelled") {
+    return "Cancelled"
+  }
+
+  return "Pending"
+}
+
+function getStatusClasses(order: Order) {
+  if (order.dispatched) {
+    return "bg-blue-50 text-blue-700 border-blue-200"
+  }
+
+  const status = getOrderStatus(order)
+
+  if (status === "confirmed") {
+    return "bg-green-50 text-green-700 border-green-200"
+  }
+
+  if (status === "cancelled") {
+    return "bg-red-50 text-red-700 border-red-200"
+  }
+
+  return "bg-orange-50 text-orange-700 border-orange-200"
+}
+
+function getProductDetails(order: Order) {
+  if (!order.items?.length) {
+    return "Order"
+  }
+
+  return order.items
+    .map((item) => {
+      const parts = [
+        item.name || "Product",
+        item.quantity ? `x${item.quantity}` : "",
+        item.color ? `Color: ${item.color}` : "",
+        item.size ? `Size: ${item.size}` : "",
+      ].filter(Boolean)
+
+      return parts.join(" - ")
+    })
+    .join(", ")
+}
+
+function formatPrice(value: number) {
+  return new Intl.NumberFormat("en-PK").format(
+    Number(value || 0)
+  )
+}
+
+function formatDate(date: string) {
+  if (!date) {
+    return "-"
+  }
+
+  return new Date(date).toLocaleString("en-PK", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  })
+}
+
+export default function AdminOrdersPage() {
+  const [orders, setOrders] = useState<Order[]>([])
+
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+
+  const [search, setSearch] = useState("")
+
+  const [filterStatus, setFilterStatus] =
+    useState<FilterStatus>("all")
+
+  const [page, setPage] = useState(1)
+
+  const [selectedOrder, setSelectedOrder] =
+    useState<Order | null>(null)
+
+  const [editingOrder, setEditingOrder] =
+    useState<Order | null>(null)
+
+  const [actionLoading, setActionLoading] =
+    useState<string | null>(null)
+
+  const [message, setMessage] = useState("")
+  const [error, setError] = useState("")
 
   useEffect(() => {
-    const isAdmin = localStorage.getItem("isAdmin") === "true"
-
-    if (!isAdmin) {
-      router.replace("/admin/login")
-    } else {
-      setIsAllowed(true)
-      fetchOrders()
-    }
+    fetchOrders()
   }, [])
 
-  const openLocation = (order: any) => {
-    if (!order.latitude || !order.longitude) {
-      alert("No GPS location found for this order")
-      return
-    }
+  useEffect(() => {
+    setPage(1)
+  }, [search, filterStatus])
 
-    const url = `https://www.google.com/maps?q=${order.latitude},${order.longitude}`
-    window.open(url, "_blank")
-  }
+  async function fetchOrders(showRefresh = false) {
+    try {
+      setError("")
 
-  const formatWhatsappPhone = (phone: string) => {
-    const digits = String(phone || "").replace(/\D/g, "")
+      if (showRefresh) {
+        setRefreshing(true)
+      } else {
+        setLoading(true)
+      }
 
-    if (!digits) return ""
-    if (digits.startsWith("92")) return digits
-    if (digits.startsWith("0")) return `92${digits.slice(1)}`
+      const allOrders: Order[] = []
 
-    return digits
-  }
+      let from = 0
+      const batchSize = 1000
 
-  const getWhatsappOrderDetails = (order: any) => {
-    const products =
-      order.items
-        ?.map((item: any) => {
-          const quantity =
-            item.quantity && item.quantity > 1
-              ? ` x${item.quantity}`
-              : ""
+      while (true) {
+        const { data, error } = await supabaseClient
+          .from("orders")
+          .select("*")
+          .order("created_at", {
+            ascending: false,
+          })
+          .range(
+            from,
+            from + batchSize - 1
+          )
 
-          const color = item.color
-            ? ` ${String(item.color).toUpperCase()}`
-            : ""
+        if (error) {
+          throw error
+        }
 
-          return `${item.name}${quantity}${color}`
+        if (!data || data.length === 0) {
+          break
+        }
+
+        allOrders.push(
+          ...(data as Order[])
+        )
+
+        if (data.length < batchSize) {
+          break
+        }
+
+        from += batchSize
+      }
+
+      /*
+       * IMPORTANT:
+       * Explicitly type the result as Order[]
+       * so TypeScript doesn't convert order_status
+       * into a generic string.
+       */
+
+      const normalizedOrders: Order[] =
+        allOrders.map((order) => {
+          let status: OrderStatus = "pending"
+
+          if (
+            order.order_status ===
+            "confirmed"
+          ) {
+            status = "confirmed"
+          } else if (
+            order.order_status ===
+            "cancelled"
+          ) {
+            status = "cancelled"
+          }
+
+          return {
+            ...order,
+            items: Array.isArray(order.items)
+              ? order.items
+              : [],
+            order_status: status,
+          }
         })
-        .join(", ") || "aap ka product"
 
-    return order.bike_specifications
-      ? `${products} ${order.bike_specifications}`
-      : products
+      setOrders(normalizedOrders)
+    } catch (err: any) {
+      console.error(
+        "Failed to fetch orders:",
+        err
+      )
+
+      setError(
+        err?.message ||
+          "Failed to load orders."
+      )
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+    }
   }
 
-  const openWhatsappMessage = (order: any) => {
-    const phone = formatWhatsappPhone(order.phone)
+  const filteredOrders = useMemo(() => {
+    const query = search
+      .trim()
+      .toLowerCase()
 
-    if (!phone) {
-      alert("Customer phone number not found")
+    return orders.filter((order) => {
+      const status =
+        getOrderStatus(order)
+
+      let statusMatch = true
+
+      if (filterStatus === "pending") {
+        statusMatch =
+          !order.dispatched &&
+          status === "pending"
+      }
+
+      if (filterStatus === "confirmed") {
+        statusMatch =
+          !order.dispatched &&
+          status === "confirmed"
+      }
+
+      if (filterStatus === "cancelled") {
+        statusMatch =
+          !order.dispatched &&
+          status === "cancelled"
+      }
+
+      if (filterStatus === "dispatched") {
+        statusMatch = order.dispatched
+      }
+
+      if (!statusMatch) {
+        return false
+      }
+
+      if (!query) {
+        return true
+      }
+
+      const searchable = [
+        order.id,
+        order.name,
+        order.phone,
+        order.email,
+        order.city,
+        order.address,
+        order.tracking_number,
+        getProductDetails(order),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+
+      return searchable.includes(query)
+    })
+  }, [
+    orders,
+    search,
+    filterStatus,
+  ])
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(
+      filteredOrders.length /
+        PAGE_SIZE
+    )
+  )
+
+  const currentPageOrders =
+    filteredOrders.slice(
+      (page - 1) * PAGE_SIZE,
+      page * PAGE_SIZE
+    )
+
+  const stats = useMemo(() => {
+    const pending =
+      orders.filter(
+        (order) =>
+          !order.dispatched &&
+          getOrderStatus(order) ===
+            "pending"
+      ).length
+
+    const confirmed =
+      orders.filter(
+        (order) =>
+          !order.dispatched &&
+          getOrderStatus(order) ===
+            "confirmed"
+      ).length
+
+    const cancelled =
+      orders.filter(
+        (order) =>
+          !order.dispatched &&
+          getOrderStatus(order) ===
+            "cancelled"
+      ).length
+
+    const dispatched =
+      orders.filter(
+        (order) => order.dispatched
+      ).length
+
+    return {
+      total: orders.length,
+      pending,
+      confirmed,
+      cancelled,
+      dispatched,
+    }
+  }, [orders])
+
+  function showMessage(text: string) {
+    setMessage(text)
+
+    setTimeout(() => {
+      setMessage("")
+    }, 4000)
+  }
+
+  function showError(text: string) {
+    setError(text)
+
+    setTimeout(() => {
+      setError("")
+    }, 5000)
+  }
+
+  /*
+   * MANUAL CONFIRMATION
+   *
+   * Admin can manually confirm an order.
+   */
+
+  async function manuallyConfirmOrder(
+    order: Order
+  ) {
+    if (order.dispatched) {
+      showError(
+        "This order is already dispatched."
+      )
       return
     }
 
-    const customerName = order.name || "customer"
-    const productDetails = getWhatsappOrderDetails(order)
+    if (
+      getOrderStatus(order) ===
+      "confirmed"
+    ) {
+      showMessage(
+        "This order is already confirmed."
+      )
+      return
+    }
 
-    const price =
-      order.total ||
-      order.items?.reduce(
-        (sum: number, item: any) =>
-          sum + item.price * item.quantity,
-        0
-      ) ||
-      ""
+    if (
+      getOrderStatus(order) ===
+      "cancelled"
+    ) {
+      showError(
+        "Cancelled orders cannot be confirmed."
+      )
+      return
+    }
 
-    const message = `Assalam o Alaikum ${customerName},
+    try {
+      setActionLoading(
+        `confirm-${order.id}`
+      )
 
-*Order Confirmation*
+      const { error } =
+        await supabaseClient
+          .from("orders")
+          .update({
+            order_status:
+              "confirmed",
+          })
+          .eq("id", order.id)
 
-Aap ne *${productDetails}* order kiya hai.
-Qeemat: *Rs. ${price}*
+      if (error) {
+        throw error
+      }
 
-Barah-e-karam apna address confirm kar dein ya apni location bhej dein, taake delivery mein asani ho.
+      setOrders((current) =>
+        current.map((item) =>
+          item.id === order.id
+            ? {
+                ...item,
+                order_status:
+                  "confirmed",
+              }
+            : item
+        )
+      )
 
-*Note:* Aap parcel khol kar check kar sakte hain.
+      if (
+        selectedOrder?.id ===
+        order.id
+      ) {
+        setSelectedOrder({
+          ...selectedOrder,
+          order_status:
+            "confirmed",
+        })
+      }
 
-Shukriya.`
+      showMessage(
+        "Order manually confirmed."
+      )
+    } catch (err: any) {
+      console.error(
+        "Manual confirmation error:",
+        err
+      )
+
+      showError(
+        err?.message ||
+          "Failed to confirm order."
+      )
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  /*
+   * MANUAL CANCELLATION
+   */
+
+  async function cancelOrder(
+    order: Order
+  ) {
+    if (order.dispatched) {
+      showError(
+        "A dispatched order cannot be cancelled from here."
+      )
+      return
+    }
+
+    if (
+      getOrderStatus(order) ===
+      "cancelled"
+    ) {
+      return
+    }
+
+    const confirmed =
+      window.confirm(
+        `Cancel order of ${order.name}?`
+      )
+
+    if (!confirmed) {
+      return
+    }
+
+    try {
+      setActionLoading(
+        `cancel-${order.id}`
+      )
+
+      const { error } =
+        await supabaseClient
+          .from("orders")
+          .update({
+            order_status:
+              "cancelled",
+          })
+          .eq("id", order.id)
+
+      if (error) {
+        throw error
+      }
+
+      setOrders((current) =>
+        current.map((item) =>
+          item.id === order.id
+            ? {
+                ...item,
+                order_status:
+                  "cancelled",
+              }
+            : item
+        )
+      )
+
+      if (
+        selectedOrder?.id ===
+        order.id
+      ) {
+        setSelectedOrder({
+          ...selectedOrder,
+          order_status:
+            "cancelled",
+        })
+      }
+
+      showMessage(
+        "Order cancelled."
+      )
+    } catch (err: any) {
+      console.error(
+        "Cancel order error:",
+        err
+      )
+
+      showError(
+        err?.message ||
+          "Failed to cancel order."
+      )
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  /*
+   * BOOK SHIPMENT
+   */
+
+  async function bookShipment(
+    order: Order
+  ) {
+    if (order.dispatched) {
+      showError(
+        "This order has already been booked."
+      )
+      return
+    }
+
+    if (
+      getOrderStatus(order) !==
+      "confirmed"
+    ) {
+      showError(
+        "Please confirm the order before booking shipment."
+      )
+      return
+    }
+
+    const isRainOrder =
+      isRainCategoryOrder(order)
+
+    /*
+     * Rain Suit / Rain Coat:
+     * Always PostEx + KHAN_ZAIB.
+     */
+
+    const effectiveProvider =
+      isRainOrder
+        ? "postex"
+        : order.courier_provider ||
+          "postex"
+
+    const accountKey =
+      isRainOrder
+        ? "KHAN_ZAIB"
+        : undefined
+
+    try {
+      setActionLoading(
+        `book-${order.id}`
+      )
+
+      setError("")
+
+      const totalItems =
+        order.items?.reduce(
+          (sum, item) =>
+            sum +
+            Number(
+              item.quantity || 1
+            ),
+          0
+        ) || 1
+
+      const totalWeight = Math.max(
+        totalItems * 0.3,
+        0.5
+      )
+
+      const orderDetail =
+        getProductDetails(order)
+
+      const payload: Record<
+        string,
+        any
+      > = {
+        orderId: order.id,
+
+        orderRefNumber:
+          `BIN-${order.id
+            .slice(0, 8)
+            .toUpperCase()}`,
+
+        invoicePayment:
+          String(order.total),
+
+        orderDetail,
+
+        customerName:
+          order.name,
+
+        customerPhone:
+          order.phone,
+
+        deliveryAddress:
+          order.address,
+
+        transactionNotes:
+          "Allowed To Open",
+
+        cityName:
+          order.city,
+
+        invoiceDivision: 1,
+
+        items: totalItems,
+
+        weight: totalWeight,
+
+        orderType: "Normal",
+
+        pickupAddressCode:
+          "001",
+
+        pickupAddress:
+          "House # 44 5/f1 Orangi Town Karachi",
+      }
+
+      if (accountKey) {
+        payload.accountKey =
+          accountKey
+      }
+
+      const endpoint =
+        effectiveProvider ===
+        "nextstep"
+          ? "/api/nextstep/create"
+          : "/api/postex/create"
+
+      console.log(
+        "Courier booking:",
+        {
+          endpoint,
+          provider:
+            effectiveProvider,
+          payload,
+        }
+      )
+
+      const response =
+        await fetch(
+          endpoint,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body: JSON.stringify(
+              payload
+            ),
+          }
+        )
+
+      const result =
+        await response.json()
+
+      if (!response.ok) {
+        throw new Error(
+          result?.statusMessage ||
+            result?.message ||
+            "Courier booking failed."
+        )
+      }
+
+      console.log(
+        "Courier response:",
+        result
+      )
+
+      const dist =
+        result?.dist || {}
+
+      const trackingNumber =
+        dist?.trackingNumber ||
+        dist?.tracking_number ||
+        dist?.trackingNo ||
+        dist?.order
+          ?.trackingNumber ||
+        dist?.order
+          ?.tracking_number ||
+        result?.trackingNumber ||
+        result?.tracking_number ||
+        null
+
+      const updatePayload: Record<
+        string,
+        unknown
+      > = {
+        dispatched: true,
+        order_status:
+          "confirmed",
+        tracking_number:
+          trackingNumber,
+        courier_provider:
+          effectiveProvider,
+      }
+
+      let {
+        error: updateError,
+      } =
+        await supabaseClient
+          .from("orders")
+          .update(
+            updatePayload
+          )
+          .eq("id", order.id)
+
+      /*
+       * Compatibility fallback if
+       * courier_provider doesn't exist.
+       */
+
+      if (
+        updateError &&
+        updateError.message
+          ?.toLowerCase()
+          .includes(
+            "courier_provider"
+          )
+      ) {
+        const fallbackPayload = {
+          dispatched: true,
+          order_status:
+            "confirmed",
+          tracking_number:
+            trackingNumber,
+        }
+
+        const fallback =
+          await supabaseClient
+            .from("orders")
+            .update(
+              fallbackPayload
+            )
+            .eq("id", order.id)
+
+        updateError =
+          fallback.error
+      }
+
+      if (updateError) {
+        throw updateError
+      }
+
+      setOrders((current) =>
+        current.map((item) =>
+          item.id === order.id
+            ? {
+                ...item,
+                dispatched: true,
+                order_status:
+                  "confirmed",
+                tracking_number:
+                  trackingNumber,
+                courier_provider:
+                  effectiveProvider,
+              }
+            : item
+        )
+      )
+
+      if (
+        selectedOrder?.id ===
+        order.id
+      ) {
+        setSelectedOrder({
+          ...selectedOrder,
+          dispatched: true,
+          order_status:
+            "confirmed",
+          tracking_number:
+            trackingNumber,
+          courier_provider:
+            effectiveProvider,
+        })
+      }
+
+      showMessage(
+        trackingNumber
+          ? `Shipment booked successfully. Tracking: ${trackingNumber}`
+          : "Shipment booked successfully."
+      )
+    } catch (err: any) {
+      console.error(
+        "Courier booking error:",
+        err
+      )
+
+      showError(
+        err?.message ||
+          "Unable to book shipment."
+      )
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  /*
+   * DELETE
+   */
+
+  async function deleteOrder(
+    order: Order
+  ) {
+    const confirmed =
+      window.confirm(
+        `Delete order of ${order.name}?\n\nThis action cannot be undone.`
+      )
+
+    if (!confirmed) {
+      return
+    }
+
+    try {
+      setActionLoading(
+        `delete-${order.id}`
+      )
+
+      const { error } =
+        await supabaseClient
+          .from("orders")
+          .delete()
+          .eq("id", order.id)
+
+      if (error) {
+        throw error
+      }
+
+      setOrders((current) =>
+        current.filter(
+          (item) =>
+            item.id !== order.id
+        )
+      )
+
+      if (
+        selectedOrder?.id ===
+        order.id
+      ) {
+        setSelectedOrder(null)
+      }
+
+      showMessage(
+        "Order deleted successfully."
+      )
+    } catch (err: any) {
+      console.error(
+        "Delete order error:",
+        err
+      )
+
+      showError(
+        err?.message ||
+          "Failed to delete order."
+      )
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  /*
+   * EDIT
+   */
+
+  async function saveEdit() {
+    if (!editingOrder) {
+      return
+    }
+
+    try {
+      setActionLoading(
+        `edit-${editingOrder.id}`
+      )
+
+      const updatePayload = {
+        name: editingOrder.name,
+        phone: editingOrder.phone,
+        email:
+          editingOrder.email ||
+          null,
+        city: editingOrder.city,
+        address:
+          editingOrder.address,
+        total: Number(
+          editingOrder.total
+        ),
+        bike_specifications:
+          editingOrder.bike_specifications ||
+          null,
+      }
+
+      const {
+        data,
+        error,
+      } = await supabaseClient
+        .from("orders")
+        .update(updatePayload)
+        .eq("id", editingOrder.id)
+        .select()
+        .single()
+
+      if (error) {
+        throw error
+      }
+
+      setOrders((current) =>
+        current.map((order) =>
+          order.id ===
+          editingOrder.id
+            ? {
+                ...order,
+                ...(data as Order),
+              }
+            : order
+        )
+      )
+
+      setEditingOrder(null)
+
+      if (
+        selectedOrder?.id ===
+        editingOrder.id
+      ) {
+        setSelectedOrder({
+          ...selectedOrder,
+          ...(data as Order),
+        })
+      }
+
+      showMessage(
+        "Order updated successfully."
+      )
+    } catch (err: any) {
+      console.error(
+        "Edit order error:",
+        err
+      )
+
+      showError(
+        err?.message ||
+          "Failed to update order."
+      )
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  function openGoogleMaps(
+    order: Order
+  ) {
+    if (
+      order.latitude !==
+        null &&
+      order.latitude !==
+        undefined &&
+      order.longitude !==
+        null &&
+      order.longitude !==
+        undefined
+    ) {
+      window.open(
+        `https://www.google.com/maps?q=${order.latitude},${order.longitude}`,
+        "_blank"
+      )
+
+      return
+    }
+
+    const address =
+      encodeURIComponent(
+        `${order.address}, ${order.city}, Pakistan`
+      )
 
     window.open(
-      `https://wa.me/${phone}?text=${encodeURIComponent(message)}`,
+      `https://www.google.com/maps/search/?api=1&query=${address}`,
       "_blank"
     )
   }
 
-  const recalculateOrderTotal = (items: any[] = []) =>
-    items.reduce(
-      (sum, item) =>
-        sum +
-        Number(item.price || 0) *
-          Math.max(Number(item.quantity || 1), 1),
-      0
-    )
-
-  const updateEditedItem = (
-    index: number,
-    field: "color" | "quantity" | "price",
-    value: string
-  ) => {
-    const nextItems = [...(editedData.items || [])]
-    const currentItem = nextItems[index] || {}
-
-    nextItems[index] = {
-      ...currentItem,
-      [field]:
-        field === "quantity"
-          ? Math.max(Number(value || 1), 1)
-          : field === "price"
-          ? Math.max(Number(value || 0), 0)
-          : value,
-    }
-
-    setEditedData({
-      ...editedData,
-      items: nextItems,
-      total: recalculateOrderTotal(nextItems),
-    })
-  }
-
-  // Removes a single line item from the order being edited
-  // (e.g. the customer cancelled one product out of a
-  // multi-item order) and recalculates the total.
-  const removeEditedItem = (index: number) => {
-    const nextItems = (editedData.items || []).filter(
-      (_: any, i: number) => i !== index
-    )
-
-    setEditedData({
-      ...editedData,
-      items: nextItems,
-      total: recalculateOrderTotal(nextItems),
-    })
-  }
-
-  // Format created_at for display
-  const formatOrderDate = (date: string) => {
-    if (!date) return "-"
-
-    const parsedDate = new Date(date)
-
-    if (isNaN(parsedDate.getTime())) {
-      return "-"
-    }
-
-    return parsedDate.toLocaleString("en-PK", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  }
-
-  const fetchOrders = async () => {
-    setStatus("Syncing with database...")
-
-    let allOrders: any[] = []
-    let from = 0
-    const batchSize = 1000
-    let finished = false
-
-    while (!finished) {
-      const { data, error } = await supabaseClient
-        .from("orders")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .range(from, from + batchSize - 1)
-
-      if (error) {
-        setStatus("Failed to load orders.")
-        console.error(error)
-        break
-      }
-
-      if (data && data.length > 0) {
-        allOrders = [...allOrders, ...data]
-        from += batchSize
-
-        if (data.length < batchSize) {
-          finished = true
-        }
-      } else {
-        finished = true
-      }
-    }
-
-    setOrders(allOrders)
-
-    const labels: Record<string, CustomerTrustLabel> = {}
-
-    for (const order of allOrders) {
-      labels[order.id] = getCustomerTrustLabel(
-        order.phone,
-        order.id,
-        allOrders
-      )
-    }
-
-    setCustomerLabels(labels)
-
-    const pending = allOrders.filter(
-      (o: Order) => !o.dispatched
-    )
-
-    setFilteredOrders(pending)
-    setFilterStatus("pending")
-
-    setStatus(null)
-    setLoading(false)
-  }
-
-  const confirmAction = (
-    type: "delete" | "dispatch",
-    id: string
-  ) => {
-    setPopup({ type, id })
-  }
-
-  const closePopup = () => {
-    setPopup(null)
-    setIsConfirming(false)
-  }
-
-  const handleConfirm = async () => {
-    if (!popup) return
-
-    // Flip the button into its loading state immediately so the
-    // admin gets feedback that the click registered, before any
-    // network call has even started.
-    setIsConfirming(true)
-
-    const { type, id } = popup
-
-    if (type === "delete") {
-      try {
-        setStatus("Removing order...")
-
-        const { error } = await supabaseClient
-          .from("orders")
-          .delete()
-          .eq("id", id!)
-
-        if (error) throw error
-
-        await fetchOrders()
-        setStatus("Order deleted.")
-      } catch (err: any) {
-        console.error(err)
-        setStatus("Delete failed.")
-      }
-    }
-
-    if (type === "dispatch") {
-      const order = orders.find((o) => o.id === id)
-
-      if (!order) {
-        closePopup()
-        return
-      }
-
-      // Rain Suit / Rain Coat orders always go through PostEx,
-      // using the dedicated Khan Zaib PostEx account — this
-      // overrides whatever provider is currently selected in
-      // the courier toggle.
-      const forcePostexRainAccount = isRainCategoryOrder(order)
-      const effectiveProvider = forcePostexRainAccount
-        ? "postex"
-        : provider
-
-      setStatus(
-        forcePostexRainAccount
-          ? "Processing PostEx (Khan Zaib account) booking..."
-          : `Processing ${
-              effectiveProvider === "nextstep"
-                ? "NextStep"
-                : "PostEx"
-            } booking...`
-      )
-
-      try {
-        const totalWeight = Math.max(
-          order.items?.reduce(
-            (sum: number, item: any) =>
-              sum + 0.3 * item.quantity,
-            0
-          ) || 0,
-          0.5
-        )
-
-        const payload = {
-          orderId: order.id,
-          orderRefNumber: order.id
-            .slice(0, 8)
-            .toUpperCase(),
-          invoicePayment: order.total,
-
-          orderDetail:
-            order.items
-              ?.map(
-                (i: any) =>
-                  `${i.name} x${i.quantity} | ${(
-                    i.color || ""
-                  ).toUpperCase()} `
-              )
-              .join(", ") +
-            (order.bike_specifications
-              ? `| Bike: ${order.bike_specifications}`
-              : ""),
-
-          customerName: order.name,
-          customerPhone: order.phone,
-          deliveryAddress: order.address,
-          transactionNotes: "Allowed To Open",
-          cityName: order.city || "Karachi",
-          invoiceDivision: 1,
-          items: order.items?.length || 1,
-          orderType: "Normal",
-          pickupAddressCode: "001",
-          weight: totalWeight,
-
-          // Tells /api/postex/create which token to sign the
-          // booking with. The route should read this and use
-          // process.env.POSTEX_TOKEN_KHAN_ZAIB when present,
-          // falling back to the default PostEx token otherwise.
-          ...(forcePostexRainAccount
-            ? { accountKey: "KHAN_ZAIB" }
-            : {}),
-        }
-
-        const bookingEndpoint =
-          effectiveProvider === "nextstep"
-            ? "/api/nextstep/create"
-            : "/api/postex/create"
-
-        const res = await fetch(bookingEndpoint, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-        })
-
-        const data = await res.json()
-
-        if (!res.ok || data.statusCode !== "200") {
-          setStatus(
-            `Error: ${
-              data.statusMessage ||
-              "Courier booking rejected"
-            }`
-          )
-
-          closePopup()
-          return
-        }
-
-        const trackingNumber =
-          data.dist?.trackingNumber || "N/A"
-
-        setOrders((prev) =>
-          prev.map((o) =>
-            o.id === id
-              ? {
-                  ...o,
-                  dispatched: true,
-                  tracking_number: trackingNumber,
-                }
-              : o
-          )
-        )
-
-        setFilteredOrders((prev) =>
-          prev.map((o) =>
-            o.id === id
-              ? {
-                  ...o,
-                  dispatched: true,
-                  tracking_number: trackingNumber,
-                }
-              : o
-          )
-        )
-
-        const updatePayload: Record<string, unknown> = {
-          dispatched: true,
-          tracking_number: trackingNumber,
-          courier_provider: effectiveProvider,
-        }
-
-        let { error: updateError } =
-          await supabaseClient
-            .from("orders")
-            .update(updatePayload)
-            .eq("id", id!)
-
-        if (
-          updateError?.message?.includes(
-            "courier_provider"
-          )
-        ) {
-          delete updatePayload.courier_provider
-
-          ;({ error: updateError } =
-            await supabaseClient
-              .from("orders")
-              .update(updatePayload)
-              .eq("id", id!))
-        }
-
-        if (updateError) throw updateError
-
-        setStatus(
-          `Success! Tracking: ${trackingNumber}`
-        )
-      } catch (err: any) {
-        console.error(err)
-        setStatus("Booking failed.")
-      }
-    }
-
-    closePopup()
-  }
-
-  const saveEdit = async () => {
-    try {
-      const updatedItems = editedData.items || []
-
-      const updatePayload = {
-        ...editedData,
-        total: recalculateOrderTotal(updatedItems),
-      }
-
-      const { error } = await supabaseClient
-        .from("orders")
-        .update(updatePayload)
-        .eq("id", editId!)
-
-      if (error) throw error
-
-      await fetchOrders()
-
-      setEditId(null)
-      setStatus("Update successful.")
-    } catch (err: any) {
-      console.error(err)
-      setStatus("Update failed.")
-    }
-  }
-
-  const handleFilter = (
-    type: "all" | "dispatched" | "pending"
-  ) => {
-    setFilterStatus(type)
-
-    if (type === "all") {
-      setFilteredOrders(orders)
-    }
-
-    if (type === "dispatched") {
-      setFilteredOrders(
-        orders.filter((o) => o.dispatched)
-      )
-    }
-
-    if (type === "pending") {
-      setFilteredOrders(
-        orders.filter((o) => !o.dispatched)
-      )
-    }
-  }
-
-  if (loading) {
-    return <LoadingSpinner />
-  }
-
-  if (!isAllowed) {
-    return null
-  }
-
-  const trustBadge = (orderId: string) => {
-    const label = customerLabels[orderId] || "new"
-
-    if (label === "trusted") {
-      return (
-        <span className="rounded-full bg-emerald-600 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
-          Trusted
-        </span>
-      )
-    }
-
-    if (label === "high-risk") {
-      return (
-        <span className="rounded-full bg-red-600 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
-          High Risk
-        </span>
-      )
-    }
-
-    return (
-      <span className="rounded-full bg-sky-600 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
-        New Customer
-      </span>
-    )
-  }
-
   return (
-    <div className="min-h-screen text-zinc-100 font-sans selection:bg-orange-700/30">
-      <div className="max-w-7xl mx-auto px-6 py-12">
+    <div className="min-h-screen bg-gray-50 p-3 sm:p-5 lg:p-6">
+      <div className="mx-auto max-w-[1600px]">
 
-        {/* STATUS */}
-        {status && (
-          <div className="mb-6 py-3 px-4 bg-orange-700/10 border border-orange-700/50 text-orange-500 text-sm rounded-lg text-center animate-pulse">
-            {status}
+        {/* HEADER */}
+
+        <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">
+              Orders
+            </h1>
+
+            <p className="mt-1 text-sm text-gray-500">
+              Manage all orders, confirmations and shipments
+            </p>
+          </div>
+
+          <button
+            onClick={() =>
+              fetchOrders(true)
+            }
+            disabled={refreshing}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-800 disabled:opacity-60"
+          >
+            <RefreshCw
+              className={`h-4 w-4 ${
+                refreshing
+                  ? "animate-spin"
+                  : ""
+              }`}
+            />
+
+            Refresh
+          </button>
+        </div>
+
+        {/* SUCCESS */}
+
+        {message && (
+          <div className="mb-4 flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+            <CheckCircle2 className="h-5 w-5" />
+            {message}
+          </div>
+        )}
+
+        {/* ERROR */}
+
+        {error && (
+          <div className="mb-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <AlertCircle className="h-5 w-5" />
+            {error}
           </div>
         )}
 
         {/* STATS */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-12">
-          {[
-            {
-              label: "Total",
-              val: orders.length,
-              type: "all",
-              icon: Package,
-              color: "zinc",
-            },
-            {
-              label: "Booked",
-              val: orders.filter(
-                (o) => o.dispatched
-              ).length,
-              type: "dispatched",
-              icon: Truck,
-              color: "white",
-            },
-            {
-              label: "Pending",
-              val: orders.filter(
-                (o) => !o.dispatched
-              ).length,
-              type: "pending",
-              icon: Clock,
-              color: "yellow",
-            },
-          ].map((stat) => (
-            <button
-              key={stat.type}
-              onClick={() =>
-                handleFilter(stat.type as any)
-              }
-              className={`relative overflow-hidden p-6 rounded-2xl border-2 transition-all duration-300 text-left group ${
-                filterStatus === stat.type
-                  ? "border-orange-400 bg-orange-400 shadow-[0_0_20px_rgba(194,65,12,0.2)]"
-                  : "border-zinc-800 bg-black hover:border-zinc-700"
-              }`}
-            >
-              <stat.icon
-                className={`w-10 h-10 mb-4 ${
-                  filterStatus === stat.type
-                    ? "text-white"
-                    : "text-zinc-700 group-hover:text-zinc-500"
-                }`}
-              />
 
-              <h2 className="text-zinc-500 uppercase text-xs font-bold tracking-widest">
-                {stat.label}
-              </h2>
+        <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
 
-              <p className="text-3xl font-black mt-1">
-                {stat.val}
-              </p>
+          <button
+            onClick={() =>
+              setFilterStatus("all")
+            }
+            className="rounded-xl border bg-white p-4 text-left shadow-sm hover:shadow-md"
+          >
+            <p className="text-xs font-semibold uppercase text-gray-500">
+              All Orders
+            </p>
 
-              {filterStatus === stat.type && (
-                <div className="absolute top-0 right-0 p-2">
-                  <Check className="text-orange-700 w-5 h-5" />
-                </div>
-              )}
-            </button>
-          ))}
+            <p className="mt-1 text-2xl font-bold">
+              {stats.total}
+            </p>
+          </button>
+
+          <button
+            onClick={() =>
+              setFilterStatus("pending")
+            }
+            className="rounded-xl border border-orange-100 bg-white p-4 text-left shadow-sm hover:shadow-md"
+          >
+            <p className="text-xs font-semibold uppercase text-orange-600">
+              Pending
+            </p>
+
+            <p className="mt-1 text-2xl font-bold">
+              {stats.pending}
+            </p>
+          </button>
+
+          <button
+            onClick={() =>
+              setFilterStatus("confirmed")
+            }
+            className="rounded-xl border border-green-100 bg-white p-4 text-left shadow-sm hover:shadow-md"
+          >
+            <p className="text-xs font-semibold uppercase text-green-600">
+              Confirmed
+            </p>
+
+            <p className="mt-1 text-2xl font-bold">
+              {stats.confirmed}
+            </p>
+          </button>
+
+          <button
+            onClick={() =>
+              setFilterStatus("cancelled")
+            }
+            className="rounded-xl border border-red-100 bg-white p-4 text-left shadow-sm hover:shadow-md"
+          >
+            <p className="text-xs font-semibold uppercase text-red-600">
+              Cancelled
+            </p>
+
+            <p className="mt-1 text-2xl font-bold">
+              {stats.cancelled}
+            </p>
+          </button>
+
+          <button
+            onClick={() =>
+              setFilterStatus(
+                "dispatched"
+              )
+            }
+            className="rounded-xl border border-blue-100 bg-white p-4 text-left shadow-sm hover:shadow-md"
+          >
+            <p className="text-xs font-semibold uppercase text-blue-600">
+              Dispatched
+            </p>
+
+            <p className="mt-1 text-2xl font-bold">
+              {stats.dispatched}
+            </p>
+          </button>
         </div>
 
-        {/* ORDERS */}
-        {filteredOrders.length === 0 ? (
-          <div className="text-center py-20 border-2 border-dashed border-zinc-800 rounded-3xl">
-            <Package className="w-12 h-12 text-zinc-800 mx-auto mb-4" />
+        {/* SEARCH */}
 
-            <p className="text-zinc-600">
-              No records found in this category.
-            </p>
-          </div>
-        ) : (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="mb-5 rounded-xl border bg-white p-3 shadow-sm">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
 
-            {filteredOrders.map((order) => (
-              <div
-                key={order.id}
-                className="group border border-orange-700 rounded-2xl p-6 hover:border-orange-700/50 transition-all duration-300 shadow-xl"
-              >
+            <div className="relative w-full lg:max-w-lg">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
 
-                {/* CARD HEADER */}
-                <div className="flex justify-between items-start mb-6">
+              <input
+                value={search}
+                onChange={(e) =>
+                  setSearch(
+                    e.target.value
+                  )
+                }
+                placeholder="Search name, phone, city, address, tracking..."
+                className="h-10 w-full rounded-lg border border-gray-200 bg-gray-50 pl-10 pr-3 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+              />
+            </div>
 
-                  <div className="flex-1">
+            <div className="flex gap-2 overflow-x-auto">
 
-                    {editId === order.id ? (
-                      <input
-                        className="border border-orange-700 rounded px-2 py-1 w-full text-blue-500 outline-none"
-                        value={editedData.name}
-                        onChange={(e) =>
-                          setEditedData({
-                            ...editedData,
-                            name: e.target.value,
-                          })
-                        }
-                      />
-                    ) : (
-                      <div>
-                        <h3 className="text-xl font-bold text-blue-500 group-hover:text-orange-500 transition-colors">
-                          {order.name}
-                        </h3>
-
-                        <div className="mt-2">
-                          {trustBadge(order.id)}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* ORDER ID */}
-                    <p className="text-[10px] text-zinc-500 font-mono mt-2 uppercase tracking-tighter">
-                      ID: {order.id.slice(0, 12)}...
-                    </p>
-
-                    {/* ORDER DATE */}
-                    <p className="text-xs text-orange-500 font-semibold mt-2">
-                      Order Date:{" "}
-                      <span className="text-zinc-400">
-                        {formatOrderDate(
-                          order.created_at
-                        )}
-                      </span>
-                    </p>
-
-                  </div>
-
-                  {/* STATUS */}
-                  <div
-                    className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-tighter ${
-                      order.dispatched
-                        ? "bg-orange-700/20 text-orange-500"
-                        : "bg-red-700 text-white"
+              {[
+                ["all", "All"],
+                ["pending", "Pending"],
+                ["confirmed", "Confirmed"],
+                ["cancelled", "Cancelled"],
+                [
+                  "dispatched",
+                  "Dispatched",
+                ],
+              ].map(
+                ([value, label]) => (
+                  <button
+                    key={value}
+                    onClick={() =>
+                      setFilterStatus(
+                        value as FilterStatus
+                      )
+                    }
+                    className={`whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium ${
+                      filterStatus ===
+                      value
+                        ? "bg-gray-900 text-white"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                     }`}
                   >
-                    {order.dispatched
-                      ? "Booked"
-                      : "Pending"}
-                  </div>
+                    {label}
+                  </button>
+                )
+              )}
+            </div>
+          </div>
+        </div>
 
-                </div>
+        {/* ORDERS TABLE */}
 
-                {/* CUSTOMER CONTENT */}
-                <div className="space-y-3 text-sm border-t border-zinc-800 pt-4">
+        <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
 
-                  {/* PHONE */}
-                  <div className="flex justify-between">
+          {loading ? (
+            <div className="flex min-h-[400px] items-center justify-center">
+              <div className="flex items-center gap-2 text-gray-500">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Loading orders...
+              </div>
+            </div>
+          ) : currentPageOrders.length === 0 ? (
+            <div className="flex min-h-[400px] flex-col items-center justify-center text-center">
+              <Package className="mb-3 h-10 w-10 text-gray-300" />
 
-                    <span className="text-black">
-                      Phone:
-                    </span>
+              <h3 className="font-semibold text-gray-900">
+                No orders found
+              </h3>
 
-                    {editId === order.id ? (
-                      <input
-                        className="bg-zinc-800 text-right text-blue-500"
-                        value={editedData.phone}
-                        onChange={(e) =>
-                          setEditedData({
-                            ...editedData,
-                            phone: e.target.value,
-                          })
+              <p className="mt-1 text-sm text-gray-500">
+                No orders match the selected filter.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* DESKTOP TABLE */}
+
+              <div className="hidden overflow-x-auto md:block">
+                <table className="w-full min-w-[1250px] text-sm">
+
+                  <thead className="border-b bg-gray-50">
+                    <tr className="text-left text-xs uppercase tracking-wide text-gray-500">
+
+                      <th className="px-4 py-3">
+                        Customer
+                      </th>
+
+                      <th className="px-4 py-3">
+                        Product
+                      </th>
+
+                      <th className="px-4 py-3">
+                        Amount
+                      </th>
+
+                      <th className="px-4 py-3">
+                        Address
+                      </th>
+
+                      <th className="px-4 py-3">
+                        Status
+                      </th>
+
+                      <th className="px-4 py-3">
+                        Courier
+                      </th>
+
+                      <th className="px-4 py-3">
+                        Date
+                      </th>
+
+                      <th className="px-4 py-3 text-right">
+                        Actions
+                      </th>
+
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y">
+
+                    {currentPageOrders.map(
+                      (order) => {
+                        const status =
+                          getOrderStatus(
+                            order
+                          )
+
+                        const confirming =
+                          actionLoading ===
+                          `confirm-${order.id}`
+
+                        const cancelling =
+                          actionLoading ===
+                          `cancel-${order.id}`
+
+                        const booking =
+                          actionLoading ===
+                          `book-${order.id}`
+
+                        return (
+                          <tr
+                            key={
+                              order.id
+                            }
+                            className="hover:bg-gray-50"
+                          >
+
+                            {/* CUSTOMER */}
+
+                            <td className="px-4 py-4">
+                              <button
+                                onClick={() =>
+                                  setSelectedOrder(
+                                    order
+                                  )
+                                }
+                                className="text-left"
+                              >
+                                <p className="font-semibold text-gray-900 hover:text-orange-600">
+                                  {
+                                    order.name
+                                  }
+                                </p>
+
+                                <p className="mt-1 text-xs text-gray-500">
+                                  {
+                                    order.phone
+                                  }
+                                </p>
+                              </button>
+                            </td>
+
+                            {/* PRODUCT */}
+
+                            <td className="max-w-[260px] px-4 py-4">
+                              <p className="line-clamp-3 text-gray-700">
+                                {getProductDetails(
+                                  order
+                                )}
+                              </p>
+                            </td>
+
+                            {/* AMOUNT */}
+
+                            <td className="whitespace-nowrap px-4 py-4">
+                              <span className="font-bold">
+                                Rs.{" "}
+                                {formatPrice(
+                                  order.total
+                                )}
+                              </span>
+                            </td>
+
+                            {/* ADDRESS */}
+
+                            <td className="max-w-[230px] px-4 py-4">
+                              <p className="line-clamp-2 text-xs text-gray-600">
+                                {
+                                  order.address
+                                }
+                              </p>
+
+                              <p className="mt-1 text-xs font-semibold text-gray-500">
+                                {
+                                  order.city
+                                }
+                              </p>
+                            </td>
+
+                            {/* STATUS */}
+
+                            <td className="px-4 py-4">
+                              <span
+                                className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${getStatusClasses(
+                                  order
+                                )}`}
+                              >
+                                {order.dispatched ? (
+                                  <Truck className="h-3.5 w-3.5" />
+                                ) : status ===
+                                  "confirmed" ? (
+                                  <CheckCircle2 className="h-3.5 w-3.5" />
+                                ) : status ===
+                                  "cancelled" ? (
+                                  <Ban className="h-3.5 w-3.5" />
+                                ) : (
+                                  <Clock3 className="h-3.5 w-3.5" />
+                                )}
+
+                                {getStatusLabel(
+                                  order
+                                )}
+                              </span>
+                            </td>
+
+                            {/* COURIER */}
+
+                            <td className="px-4 py-4">
+
+                              {order.courier_provider ? (
+                                <span className="text-xs font-semibold uppercase text-gray-600">
+                                  {
+                                    order.courier_provider
+                                  }
+                                </span>
+                              ) : (
+                                <span className="text-xs text-gray-400">
+                                  Not booked
+                                </span>
+                              )}
+
+                              {order.tracking_number && (
+                                <p className="mt-1 font-mono text-xs text-gray-500">
+                                  {
+                                    order.tracking_number
+                                  }
+                                </p>
+                              )}
+
+                            </td>
+
+                            {/* DATE */}
+
+                            <td className="whitespace-nowrap px-4 py-4 text-xs text-gray-500">
+                              {formatDate(
+                                order.created_at
+                              )}
+                            </td>
+
+                            {/* ACTIONS */}
+
+                            <td className="px-4 py-4">
+
+                              <div className="flex items-center justify-end gap-1.5">
+
+                                {/* MANUAL CONFIRM */}
+
+                                {!order.dispatched &&
+                                  status ===
+                                    "pending" && (
+                                    <button
+                                      onClick={() =>
+                                        manuallyConfirmOrder(
+                                          order
+                                        )
+                                      }
+                                      disabled={
+                                        confirming
+                                      }
+                                      title="Manually confirm order"
+                                      className="inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-2 text-xs font-bold text-white hover:bg-green-700 disabled:opacity-50"
+                                    >
+                                      {confirming ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                      ) : (
+                                        <CheckCircle2 className="h-4 w-4" />
+                                      )}
+
+                                      Confirm
+                                    </button>
+                                  )}
+
+                                {/* BOOK */}
+
+                                {!order.dispatched &&
+                                  status ===
+                                    "confirmed" && (
+                                    <button
+                                      onClick={() =>
+                                        bookShipment(
+                                          order
+                                        )
+                                      }
+                                      disabled={
+                                        booking
+                                      }
+                                      title="Book courier shipment"
+                                      className="inline-flex items-center gap-1.5 rounded-lg bg-orange-500 px-3 py-2 text-xs font-bold text-white hover:bg-orange-600 disabled:opacity-50"
+                                    >
+                                      {booking ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                      ) : (
+                                        <Truck className="h-4 w-4" />
+                                      )}
+
+                                      Book
+                                    </button>
+                                  )}
+
+                                {/* CANCEL */}
+
+                                {!order.dispatched &&
+                                  status !==
+                                    "cancelled" && (
+                                    <button
+                                      onClick={() =>
+                                        cancelOrder(
+                                          order
+                                        )
+                                      }
+                                      disabled={
+                                        cancelling
+                                      }
+                                      title="Cancel order"
+                                      className="rounded-lg border border-red-200 p-2 text-red-600 hover:bg-red-50 disabled:opacity-50"
+                                    >
+                                      {cancelling ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                      ) : (
+                                        <Ban className="h-4 w-4" />
+                                      )}
+                                    </button>
+                                  )}
+
+                                {/* EDIT */}
+
+                                <button
+                                  onClick={() =>
+                                    setEditingOrder(
+                                      {
+                                        ...order,
+                                      }
+                                    )
+                                  }
+                                  title="Edit"
+                                  className="rounded-lg border border-gray-200 p-2 text-gray-600 hover:bg-gray-100"
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </button>
+
+                                {/* DELETE */}
+
+                                <button
+                                  onClick={() =>
+                                    deleteOrder(
+                                      order
+                                    )
+                                  }
+                                  title="Delete"
+                                  className="rounded-lg border border-red-200 p-2 text-red-600 hover:bg-red-50"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+
+                              </div>
+                            </td>
+
+                          </tr>
+                        )
+                      }
+                    )}
+
+                  </tbody>
+                </table>
+              </div>
+
+              {/* MOBILE */}
+
+              <div className="divide-y md:hidden">
+
+                {currentPageOrders.map(
+                  (order) => {
+                    const status =
+                      getOrderStatus(
+                        order
+                      )
+
+                    const confirming =
+                      actionLoading ===
+                      `confirm-${order.id}`
+
+                    const booking =
+                      actionLoading ===
+                      `book-${order.id}`
+
+                    return (
+                      <div
+                        key={
+                          order.id
                         }
-                      />
-                    ) : (
-                      <h2 className="text-blue-500 font-bold text-[20px]">
-                        {order.phone}
-                      </h2>
-                    )}
-
-                  </div>
-
-                  {/* ADDRESS */}
-                  <div className="flex flex-col">
-
-                    <span className="text-zinc-500 mb-1">
-                      Shipping Address:
-                    </span>
-
-                    {editId === order.id ? (
-                      <div className="space-y-2">
-
-                        <textarea
-                          className="bg-zinc-800 text-orange-500 text-xs p-2 rounded"
-                          value={
-                            editedData.address || ""
-                          }
-                          onChange={(e) =>
-                            setEditedData({
-                              ...editedData,
-                              address: e.target.value,
-                            })
-                          }
-                        />
-
-                        <input
-                          className="bg-zinc-800 text-orange-500 text-xs p-2 rounded"
-                          value={
-                            editedData.city || ""
-                          }
-                          onChange={(e) =>
-                            setEditedData({
-                              ...editedData,
-                              city: e.target.value,
-                            })
-                          }
-                          placeholder="City"
-                        />
-
-                      </div>
-                    ) : (
-                      <span className="text-black leading-snug">
-                        {order.address},{" "}
-                        <span className="text-orange-700">
-                          {order.city}
-                        </span>
-                      </span>
-                    )}
-
-                  </div>
-
-                  {/* LOCATION / WHATSAPP */}
-                  <div className="mt-2 grid grid-cols-2 gap-2">
-
-                    <Button
-                      className="bg-green-600 hover:bg-green-700 text-white"
-                      onClick={() =>
-                        openLocation(order)
-                      }
-                    >
-                      <LocateIcon className="w-4 h-4 mr-2" />
-                      Location
-                    </Button>
-
-                    <Button
-                      className="bg-green-600 hover:bg-green-700 text-white"
-                      onClick={() =>
-                        openWhatsappMessage(order)
-                      }
-                    >
-                      <MessageCircle className="w-4 h-4 mr-2" />
-                      WhatsApp
-                    </Button>
-
-                  </div>
-
-                </div>
-
-                {/* MANIFEST */}
-                <div className="mt-6 border rounded-xl p-4">
-
-                  <p className="text-[10px] font-bold text-zinc-600 uppercase mb-3 tracking-widest">
-                    Manifest
-                  </p>
-
-                  <ul className="space-y-2">
-
-                    {(editId === order.id
-                      ? editedData.items || []
-                      : order.items || []
-                    ).map((item: any, i: number) => (
-                      <li
-                        key={i}
-                        className="flex justify-between gap-3 text-xs border-b border-zinc-800/50 pb-2"
+                        className="p-4"
                       >
 
-                        {editId === order.id ? (
-                          <div className="flex flex-1 items-center gap-2">
+                        <div className="flex items-start justify-between gap-3">
 
-                            <div className="grid flex-1 grid-cols-[1fr_55px_65px_70px] gap-2">
-
-                              <span className="text-black self-center truncate">
-                                {item.name}
-                              </span>
-
-                              <input
-                                className="rounded bg-zinc-800 px-2 py-1 text-blue-500"
-                                min={1}
-                                type="number"
-                                value={item.quantity}
-                                onChange={(e) =>
-                                  updateEditedItem(
-                                    i,
-                                    "quantity",
-                                    e.target.value
-                                  )
-                                }
-                              />
-
-                              <input
-                                className="rounded bg-zinc-800 px-2 py-1 text-blue-500"
-                                value={item.color || ""}
-                                onChange={(e) =>
-                                  updateEditedItem(
-                                    i,
-                                    "color",
-                                    e.target.value
-                                  )
-                                }
-                                placeholder="Color"
-                              />
-
-                              <input
-                                className="rounded bg-zinc-800 px-2 py-1 text-blue-500"
-                                min={0}
-                                type="number"
-                                value={item.price}
-                                onChange={(e) =>
-                                  updateEditedItem(
-                                    i,
-                                    "price",
-                                    e.target.value
-                                  )
-                                }
-                                placeholder="Price"
-                              />
-
-                            </div>
-
-                            <button
-                              type="button"
-                              className="shrink-0 text-red-500 hover:text-red-400"
-                              onClick={() =>
-                                removeEditedItem(i)
+                          <button
+                            onClick={() =>
+                              setSelectedOrder(
+                                order
+                              )
+                            }
+                            className="min-w-0 text-left"
+                          >
+                            <p className="truncate font-bold text-gray-900">
+                              {
+                                order.name
                               }
-                              title="Remove item"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                            </p>
+
+                            <p className="mt-1 text-sm text-gray-500">
+                              {
+                                order.phone
+                              }
+                            </p>
+                          </button>
+
+                          <span
+                            className={`shrink-0 rounded-full border px-2 py-1 text-[11px] font-semibold ${getStatusClasses(
+                              order
+                            )}`}
+                          >
+                            {
+                              getStatusLabel(
+                                order
+                              )
+                            }
+                          </span>
+
+                        </div>
+
+                        <div className="mt-3 rounded-lg bg-gray-50 p-3">
+
+                          <p className="text-sm font-medium text-gray-800">
+                            {getProductDetails(
+                              order
+                            )}
+                          </p>
+
+                          <div className="mt-2 flex items-center justify-between">
+
+                            <span className="text-xs text-gray-500">
+                              {
+                                order.city
+                              }
+                            </span>
+
+                            <span className="font-bold">
+                              Rs.{" "}
+                              {formatPrice(
+                                order.total
+                              )}
+                            </span>
 
                           </div>
-                        ) : (
-                          <>
-                            <span className="text-black">
+                        </div>
 
-                              {item.name}{" "}
+                        <p className="mt-2 line-clamp-2 text-xs text-gray-500">
+                          {
+                            order.address
+                          }
+                        </p>
 
-                              <span className="text-blue-500 font-bold">
-                                x{item.quantity}{" "}
-
-                                <span className="text-black">
-                                  {order.bike_specifications}
-                                </span>
-                              </span>{" "}
-
-                              {item.color?.toUpperCase()}
-
-                            </span>
-
-                            <span className="text-black whitespace-nowrap">
-                              PKR{" "}
-                              {item.price *
-                                item.quantity}
-                            </span>
-                          </>
+                        {order.tracking_number && (
+                          <div className="mt-2 rounded-lg bg-blue-50 p-2 text-xs text-blue-700">
+                            <b>
+                              Tracking:
+                            </b>{" "}
+                            {
+                              order.tracking_number
+                            }
+                          </div>
                         )}
 
-                      </li>
-                    ))}
+                        <div className="mt-3 flex flex-wrap gap-2">
 
-                  </ul>
+                          {!order.dispatched &&
+                            status ===
+                              "pending" && (
+                              <button
+                                onClick={() =>
+                                  manuallyConfirmOrder(
+                                    order
+                                  )
+                                }
+                                disabled={
+                                  confirming
+                                }
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
+                              >
+                                {confirming ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <CheckCircle2 className="h-4 w-4" />
+                                )}
 
-                  {/* TOTAL */}
-                  <div className="flex justify-between items-center mt-4 pt-2 border-t border-orange-700/30">
+                                Confirm
+                              </button>
+                            )}
 
-                    <span className="text-xs font-bold text-orange-700">
-                      TOTAL
-                    </span>
+                          {!order.dispatched &&
+                            status ===
+                              "confirmed" && (
+                              <button
+                                onClick={() =>
+                                  bookShipment(
+                                    order
+                                  )
+                                }
+                                disabled={
+                                  booking
+                                }
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-orange-500 px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
+                              >
+                                {booking ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Truck className="h-4 w-4" />
+                                )}
 
-                    <span className="text-lg font-black text-blue-500">
-                      Rs.{" "}
-                      {editId === order.id
-                        ? editedData.total ?? order.total
-                        : order.total}
-                    </span>
+                                Book Shipment
+                              </button>
+                            )}
 
-                  </div>
+                          {!order.dispatched &&
+                            status !==
+                              "cancelled" && (
+                              <button
+                                onClick={() =>
+                                  cancelOrder(
+                                    order
+                                  )
+                                }
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-600"
+                              >
+                                <Ban className="h-4 w-4" />
+                                Cancel
+                              </button>
+                            )}
 
-                </div>
+                          <button
+                            onClick={() =>
+                              setSelectedOrder(
+                                order
+                              )
+                            }
+                            className="rounded-lg border px-3 py-2 text-xs font-semibold text-gray-700"
+                          >
+                            View
+                          </button>
 
-                {/* ACTIONS */}
-                <div className="flex gap-2 mt-6">
+                          <button
+                            onClick={() =>
+                              setEditingOrder(
+                                {
+                                  ...order,
+                                }
+                              )
+                            }
+                            className="rounded-lg border p-2 text-gray-600"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
 
-                  {editId === order.id ? (
-                    <>
-                      <Button
-                        className="flex-1 bg-orange-700 hover:bg-orange-800 text-white"
-                        onClick={saveEdit}
-                      >
-                        <Check className="w-4 h-4" />
-                      </Button>
+                          <button
+                            onClick={() =>
+                              deleteOrder(
+                                order
+                              )
+                            }
+                            className="rounded-lg border border-red-200 p-2 text-red-600"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
 
-                      <Button
-                        variant="outline"
-                        className="flex-1 border-zinc-700 text-zinc-400"
-                        onClick={() =>
-                          setEditId(null)
-                        }
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      {/* EDIT */}
-                      <Button
-                        variant="outline"
-                        className="bg-white text-zinc-800 hover:text-orange-400"
-                        onClick={() => {
-                          setEditId(order.id)
-                          setEditedData(order)
-                        }}
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </Button>
-
-                      {/* BOOK SHIPMENT */}
-                      <Button
-                        className={`flex-1 font-bold uppercase text-[10px] tracking-widest transition-all ${
-                          order.dispatched
-                            ? "bg-white text-zinc-500 cursor-not-allowed"
-                            : "bg-orange-400 hover:bg-orange-600 text-white"
-                        }`}
-                        onClick={() =>
-                          !order.dispatched &&
-                          confirmAction(
-                            "dispatch",
-                            order.id
-                          )
-                        }
-                        disabled={order.dispatched}
-                      >
-                        {order.dispatched
-                          ? "Dispatched"
-                          : "Book Shipment"}
-                      </Button>
-
-                      {/* DELETE */}
-                      <Button
-                        variant="destructive"
-                        className="bg-white hover:bg-red-900/40 text-red-500 border border-red-900/20"
-                        onClick={() =>
-                          confirmAction(
-                            "delete",
-                            order.id
-                          )
-                        }
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </>
-                  )}
-
-                </div>
-
-              </div>
-            ))}
-
-          </div>
-        )}
-
-        {/* CONFIRMATION POPUP */}
-        {popup && (
-          <div className="fixed inset-0 bg-zinc-950/90 backdrop-blur-sm flex justify-center items-center z-50 p-6">
-
-            <div className="bg-zinc-900 border border-orange-700/50 p-8 rounded-3xl max-w-sm w-full text-center shadow-2xl">
-
-              <div className="w-16 h-16 bg-orange-700/20 rounded-full flex items-center justify-center mx-auto mb-6">
-
-                {popup.type === "delete" ? (
-                  <Trash2 className="text-orange-700 w-8 h-8" />
-                ) : (
-                  <Truck className="text-orange-700 w-8 h-8" />
+                        </div>
+                      </div>
+                    )
+                  }
                 )}
 
               </div>
+            </>
+          )}
 
-              <h2 className="text-xl font-bold text-white mb-2">
-                Confirm Action
-              </h2>
+          {/* PAGINATION */}
 
-              <p className="text-zinc-500 text-sm mb-8 leading-relaxed">
+          {!loading &&
+            filteredOrders.length >
+              0 && (
+              <div className="flex flex-col gap-3 border-t bg-gray-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
 
-                {popup.type === "delete"
-                  ? "Are you sure you want to permanently remove this order from the database? This cannot be undone."
-                  : `Proceed with ${
-                      provider === "nextstep"
-                        ? "NextStep"
-                        : "PostEx"
-                    } booking? This will generate a tracking number and mark as dispatched.`}
+                <p className="text-xs text-gray-500">
+                  Showing{" "}
+                  {(page - 1) *
+                    PAGE_SIZE +
+                    1}
+                  –
+                  {Math.min(
+                    page *
+                      PAGE_SIZE,
+                    filteredOrders.length
+                  )}{" "}
+                  of{" "}
+                  {
+                    filteredOrders.length
+                  }
+                </p>
 
-              </p>
+                <div className="flex items-center gap-2">
 
-              <div className="grid grid-cols-2 gap-3">
+                  <button
+                    disabled={
+                      page <= 1
+                    }
+                    onClick={() =>
+                      setPage(
+                        (p) =>
+                          Math.max(
+                            1,
+                            p - 1
+                          )
+                      )
+                    }
+                    className="rounded-lg border bg-white px-3 py-2 text-xs disabled:opacity-40"
+                  >
+                    Previous
+                  </button>
 
-                <Button
-                  className="bg-orange-700 hover:bg-orange-800 text-white font-bold disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  onClick={handleConfirm}
-                  disabled={isConfirming}
-                >
-                  {isConfirming ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Please wait...
-                    </>
-                  ) : (
-                    "Confirm"
+                  <span className="text-xs text-gray-500">
+                    Page {page} of{" "}
+                    {totalPages}
+                  </span>
+
+                  <button
+                    disabled={
+                      page >=
+                      totalPages
+                    }
+                    onClick={() =>
+                      setPage(
+                        (p) =>
+                          Math.min(
+                            totalPages,
+                            p + 1
+                          )
+                      )
+                    }
+                    className="rounded-lg border bg-white px-3 py-2 text-xs disabled:opacity-40"
+                  >
+                    Next
+                  </button>
+
+                </div>
+              </div>
+            )}
+        </div>
+      </div>
+
+      {/* ORDER DETAILS */}
+
+      {selectedOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3">
+
+          <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
+
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-white px-5 py-4">
+
+              <div>
+                <h2 className="font-bold text-gray-900">
+                  Order Details
+                </h2>
+
+                <p className="mt-1 font-mono text-xs text-gray-400">
+                  {
+                    selectedOrder.id
+                  }
+                </p>
+              </div>
+
+              <button
+                onClick={() =>
+                  setSelectedOrder(
+                    null
+                  )
+                }
+                className="rounded-lg p-2 hover:bg-gray-100"
+              >
+                <X className="h-5 w-5" />
+              </button>
+
+            </div>
+
+            <div className="space-y-5 p-5">
+
+              {/* CUSTOMER */}
+
+              <div>
+                <h3 className="mb-3 font-bold text-gray-900">
+                  Customer
+                </h3>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+
+                  <div className="rounded-lg bg-gray-50 p-3">
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      <User className="h-4 w-4" />
+                      Name
+                    </div>
+
+                    <p className="mt-1 font-semibold">
+                      {
+                        selectedOrder.name
+                      }
+                    </p>
+                  </div>
+
+                  <div className="rounded-lg bg-gray-50 p-3">
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      <Phone className="h-4 w-4" />
+                      Phone
+                    </div>
+
+                    <p className="mt-1 font-semibold">
+                      {
+                        selectedOrder.phone
+                      }
+                    </p>
+                  </div>
+
+                </div>
+              </div>
+
+              {/* ADDRESS */}
+
+              <div>
+                <h3 className="mb-3 font-bold">
+                  Delivery Address
+                </h3>
+
+                <div className="rounded-lg bg-gray-50 p-3">
+
+                  <div className="flex gap-2">
+                    <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-gray-500" />
+
+                    <div>
+                      <p className="text-sm">
+                        {
+                          selectedOrder.address
+                        }
+                      </p>
+
+                      <p className="mt-1 text-xs font-semibold text-gray-500">
+                        {
+                          selectedOrder.city
+                        }
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() =>
+                      openGoogleMaps(
+                        selectedOrder
+                      )
+                    }
+                    className="mt-3 inline-flex items-center gap-2 rounded-lg border bg-white px-3 py-2 text-xs font-semibold"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    Open Maps
+                  </button>
+
+                </div>
+              </div>
+
+              {/* PRODUCTS */}
+
+              <div>
+                <h3 className="mb-3 font-bold">
+                  Products
+                </h3>
+
+                <div className="divide-y rounded-lg border">
+
+                  {selectedOrder.items?.map(
+                    (item, index) => (
+                      <div
+                        key={`${item.id || item.name}-${index}`}
+                        className="flex items-center justify-between gap-3 p-3"
+                      >
+
+                        <div>
+                          <p className="font-medium">
+                            {
+                              item.name
+                            }
+                          </p>
+
+                          <div className="mt-1 flex flex-wrap gap-2 text-xs text-gray-500">
+
+                            {item.quantity && (
+                              <span>
+                                Qty:{" "}
+                                {
+                                  item.quantity
+                                }
+                              </span>
+                            )}
+
+                            {item.color && (
+                              <span>
+                                Color:{" "}
+                                {
+                                  item.color
+                                }
+                              </span>
+                            )}
+
+                            {item.size && (
+                              <span>
+                                Size:{" "}
+                                {
+                                  item.size
+                                }
+                              </span>
+                            )}
+
+                          </div>
+                        </div>
+
+                        <span className="font-semibold">
+                          Rs.{" "}
+                          {formatPrice(
+                            Number(
+                              item.price ||
+                                0
+                            ) *
+                              Number(
+                                item.quantity ||
+                                  1
+                              )
+                          )}
+                        </span>
+
+                      </div>
+                    )
                   )}
-                </Button>
 
-                <Button
-                  variant="outline"
-                  className="border-zinc-800 text-zinc-400 disabled:opacity-50 disabled:cursor-not-allowed"
-                  onClick={closePopup}
-                  disabled={isConfirming}
+                  <div className="flex justify-between bg-gray-50 p-3">
+
+                    <span className="font-bold">
+                      Total
+                    </span>
+
+                    <span className="text-lg font-bold">
+                      Rs.{" "}
+                      {formatPrice(
+                        selectedOrder.total
+                      )}
+                    </span>
+
+                  </div>
+
+                </div>
+              </div>
+
+              {/* STATUS */}
+
+              <div>
+                <h3 className="mb-3 font-bold">
+                  Status
+                </h3>
+
+                <span
+                  className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold ${getStatusClasses(
+                    selectedOrder
+                  )}`}
                 >
-                  Cancel
-                </Button>
+                  {getStatusLabel(
+                    selectedOrder
+                  )}
+                </span>
 
+                {selectedOrder.tracking_number && (
+                  <div className="mt-3 rounded-lg bg-blue-50 p-3">
+
+                    <p className="text-xs text-blue-600">
+                      Tracking Number
+                    </p>
+
+                    <p className="mt-1 font-mono font-bold text-blue-900">
+                      {
+                        selectedOrder.tracking_number
+                      }
+                    </p>
+
+                  </div>
+                )}
+              </div>
+
+              {/* ACTIONS */}
+
+              <div className="border-t pt-4">
+
+                {!selectedOrder.dispatched &&
+                  getOrderStatus(
+                    selectedOrder
+                  ) ===
+                    "pending" && (
+                    <div className="flex flex-col gap-2 sm:flex-row">
+
+                      <button
+                        onClick={() =>
+                          manuallyConfirmOrder(
+                            selectedOrder
+                          )
+                        }
+                        disabled={
+                          actionLoading ===
+                          `confirm-${selectedOrder.id}`
+                        }
+                        className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-3 text-sm font-bold text-white hover:bg-green-700 disabled:opacity-50"
+                      >
+                        <CheckCircle2 className="h-5 w-5" />
+                        Manual Confirm
+                      </button>
+
+                      <button
+                        onClick={() =>
+                          cancelOrder(
+                            selectedOrder
+                          )
+                        }
+                        className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-red-200 px-4 py-3 text-sm font-bold text-red-600 hover:bg-red-50"
+                      >
+                        <Ban className="h-5 w-5" />
+                        Cancel Order
+                      </button>
+
+                    </div>
+                  )}
+
+                {!selectedOrder.dispatched &&
+                  getOrderStatus(
+                    selectedOrder
+                  ) ===
+                    "confirmed" && (
+                    <button
+                      onClick={() =>
+                        bookShipment(
+                          selectedOrder
+                        )
+                      }
+                      disabled={
+                        actionLoading ===
+                        `book-${selectedOrder.id}`
+                      }
+                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-orange-500 px-4 py-3 text-sm font-bold text-white hover:bg-orange-600 disabled:opacity-50"
+                    >
+                      {actionLoading ===
+                      `book-${selectedOrder.id}` ? (
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                      ) : (
+                        <Truck className="h-5 w-5" />
+                      )}
+
+                      Book Shipment
+                    </button>
+                  )}
+
+              </div>
+
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <CalendarDays className="h-4 w-4" />
+                {formatDate(
+                  selectedOrder.created_at
+                )}
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT MODAL */}
+
+      {editingOrder && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-3">
+
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-2xl">
+
+            <div className="flex items-center justify-between border-b px-5 py-4">
+
+              <div>
+                <h2 className="font-bold">
+                  Edit Order
+                </h2>
+
+                <p className="text-xs text-gray-400">
+                  Update customer information
+                </p>
+              </div>
+
+              <button
+                onClick={() =>
+                  setEditingOrder(
+                    null
+                  )
+                }
+                className="rounded-lg p-2 hover:bg-gray-100"
+              >
+                <X className="h-5 w-5" />
+              </button>
+
+            </div>
+
+            <div className="space-y-4 p-5">
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-gray-600">
+                  Customer Name
+                </label>
+
+                <input
+                  value={
+                    editingOrder.name
+                  }
+                  onChange={(e) =>
+                    setEditingOrder({
+                      ...editingOrder,
+                      name: e.target
+                        .value,
+                    })
+                  }
+                  className="h-10 w-full rounded-lg border px-3 text-sm outline-none focus:border-orange-400"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-gray-600">
+                  Phone
+                </label>
+
+                <input
+                  value={
+                    editingOrder.phone
+                  }
+                  onChange={(e) =>
+                    setEditingOrder({
+                      ...editingOrder,
+                      phone: e.target
+                        .value,
+                    })
+                  }
+                  className="h-10 w-full rounded-lg border px-3 text-sm outline-none focus:border-orange-400"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-gray-600">
+                  Email
+                </label>
+
+                <input
+                  value={
+                    editingOrder.email ||
+                    ""
+                  }
+                  onChange={(e) =>
+                    setEditingOrder({
+                      ...editingOrder,
+                      email: e.target
+                        .value,
+                    })
+                  }
+                  className="h-10 w-full rounded-lg border px-3 text-sm outline-none focus:border-orange-400"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-gray-600">
+                  City
+                </label>
+
+                <input
+                  value={
+                    editingOrder.city
+                  }
+                  onChange={(e) =>
+                    setEditingOrder({
+                      ...editingOrder,
+                      city: e.target
+                        .value,
+                    })
+                  }
+                  className="h-10 w-full rounded-lg border px-3 text-sm outline-none focus:border-orange-400"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-gray-600">
+                  Address
+                </label>
+
+                <textarea
+                  value={
+                    editingOrder.address
+                  }
+                  onChange={(e) =>
+                    setEditingOrder({
+                      ...editingOrder,
+                      address:
+                        e.target.value,
+                    })
+                  }
+                  rows={4}
+                  className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-orange-400"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-gray-600">
+                  Total
+                </label>
+
+                <input
+                  type="number"
+                  value={
+                    editingOrder.total
+                  }
+                  onChange={(e) =>
+                    setEditingOrder({
+                      ...editingOrder,
+                      total: Number(
+                        e.target.value
+                      ),
+                    })
+                  }
+                  className="h-10 w-full rounded-lg border px-3 text-sm outline-none focus:border-orange-400"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-gray-600">
+                  Bike Specifications
+                </label>
+
+                <input
+                  value={
+                    editingOrder.bike_specifications ||
+                    ""
+                  }
+                  onChange={(e) =>
+                    setEditingOrder({
+                      ...editingOrder,
+                      bike_specifications:
+                        e.target.value,
+                    })
+                  }
+                  placeholder="70cc, 125cc..."
+                  className="h-10 w-full rounded-lg border px-3 text-sm outline-none focus:border-orange-400"
+                />
               </div>
 
             </div>
 
-          </div>
-        )}
+            <div className="flex gap-2 border-t bg-gray-50 px-5 py-4">
 
-      </div>
+              <button
+                onClick={() =>
+                  setEditingOrder(
+                    null
+                  )
+                }
+                className="flex-1 rounded-lg border bg-white px-4 py-2.5 text-sm font-semibold"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={saveEdit}
+                disabled={
+                  actionLoading ===
+                  `edit-${editingOrder.id}`
+                }
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                {actionLoading ===
+                `edit-${editingOrder.id}` ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+
+                Save Changes
+              </button>
+
+            </div>
+
+          </div>
+        </div>
+      )}
     </div>
   )
 }

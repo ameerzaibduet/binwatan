@@ -144,6 +144,7 @@ export default function CheckoutPage() {
       })),
       total,
       dispatched: false,
+      order_status: "pending",
     }
 
     const { data, error } = await supabase.from("orders").insert([order]).select().single()
