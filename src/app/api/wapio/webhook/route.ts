@@ -1,3 +1,5 @@
+// app/api/wapio/webhook/route.ts
+
 import { NextResponse } from "next/server"
 import crypto from "crypto"
 
@@ -8,6 +10,7 @@ function verifySignature(
   const secret = process.env.WAPIO_WEBHOOK_SECRET
 
   if (!secret || !signature) {
+    console.error("Wapio webhook: missing secret or signature")
     return false
   }
 
@@ -16,83 +19,157 @@ function verifySignature(
     .update(rawBody)
     .digest("hex")
 
-  // Wapio documentation shows signatures may contain the expected hash.
-  return signature === expected || signature.includes(expected)
+  return (
+    signature === expected ||
+    signature.includes(expected)
+  )
 }
 
 export async function POST(request: Request) {
   try {
-    // IMPORTANT:
-    // Read the raw body first because the signature is calculated
-    // from the raw JSON payload.
+    // Read raw body first.
+    // Wapio calculates the signature from the raw request body.
     const rawBody = await request.text()
 
-    const signature = request.headers.get("x-webhook-signature")
+    const signature = request.headers.get(
+      "x-webhook-signature"
+    )
 
-    // Verify that the request came from Wapio
+    console.log("Wapio webhook request received")
+    console.log("Signature present:", !!signature)
+    console.log(
+      "Webhook secret present:",
+      !!process.env.WAPIO_WEBHOOK_SECRET
+    )
+
+    // Verify Wapio signature
     if (!verifySignature(rawBody, signature)) {
-      console.error("Wapio webhook: invalid signature")
+      console.error(
+        "Wapio webhook: INVALID SIGNATURE"
+      )
 
       return NextResponse.json(
-        { error: "Invalid signature" },
+        {
+          received: false,
+          error: "Invalid signature",
+        },
         { status: 401 }
       )
     }
 
-    const payload = JSON.parse(rawBody)
+    let payload: any
+
+    try {
+      payload = JSON.parse(rawBody)
+    } catch (error) {
+      console.error(
+        "Wapio webhook: invalid JSON",
+        error
+      )
+
+      return NextResponse.json(
+        {
+          received: false,
+          error: "Invalid JSON",
+        },
+        { status: 400 }
+      )
+    }
 
     console.log("=================================")
     console.log("WAPIO WEBHOOK RECEIVED")
-    console.log("Event:", payload.event)
-    console.log("Payload:", JSON.stringify(payload, null, 2))
+    console.log("Event:", payload?.event)
+    console.log(
+      "Payload:",
+      JSON.stringify(payload, null, 2)
+    )
     console.log("=================================")
 
     /*
-     * We will add the actual order-confirmation logic here
-     * after we inspect Wapio's real button/message payload.
+     * IMPORTANT:
+     *
+     * We are only inspecting incoming events for now.
+     *
+     * Once we confirm the exact payload Wapio sends when
+     * a customer clicks a WhatsApp button, we will add:
+     *
+     * Confirm Order
+     *       ↓
+     * Supabase transaction_status = confirmed
+     *
+     * Cancel Order
+     *       ↓
+     * Supabase transaction_status = cancelled
+     *
+     * Do NOT add button logic until we have the real payload.
      */
 
-    switch (payload.event) {
-      case "messages.received":
-      case "personal.message.received":
+    switch (payload?.event) {
+      case "messages.received": {
         console.log(
           "Incoming WhatsApp message:",
-          payload.data?.messages
+          payload?.data?.messages
         )
-        break
 
-      case "messages.upsert":
-        console.log(
-          "Message upsert:",
-          payload.data?.messages
-        )
         break
+      }
+
+      case "personal.message.received": {
+        console.log(
+          "Incoming personal WhatsApp message:",
+          payload?.data?.messages
+        )
+
+        break
+      }
+
+      case "messages.upsert": {
+        console.log(
+          "WhatsApp message upsert:",
+          payload?.data?.messages
+        )
+
+        break
+      }
 
       case "message-receipt.update":
-      case "messages.receipt.update":
+      case "messages.receipt.update": {
         console.log(
-          "Message receipt update:",
-          payload.data
+          "WhatsApp message receipt update:",
+          payload?.data
         )
-        break
 
-      default:
+        break
+      }
+
+      default: {
         console.log(
           "Unhandled Wapio event:",
-          payload.event
+          payload?.event
         )
+
+        break
+      }
     }
 
-    // Wapio requires a quick 200 response
+    // Always return HTTP 200 after successful verification.
     return NextResponse.json(
-      { received: true },
+      {
+        received: true,
+      },
       { status: 200 }
     )
   } catch (error) {
-    console.error("Wapio webhook error:", error)
+    console.error(
+      "Wapio webhook processing error:",
+      error
+    )
 
     return NextResponse.json(
-      { error: "Webhook processing failed" },
+      {
+        received: false,
+        error: "Webhook processing failed",
+      },
       { status: 500 }
     )
   }
