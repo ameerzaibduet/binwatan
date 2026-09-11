@@ -16,15 +16,24 @@ export async function POST(request: Request) {
       )
     }
 
-    const wapioKey = process.env.WAPIO_SK
+    const sessionKey = process.env.WAPIO_SESSION_KEY
+    const sessionId = process.env.WAPIO_SESSION_ID
 
-    if (!wapioKey) {
-      console.error("WAPIO_SK is missing")
-
+    if (!sessionKey) {
       return NextResponse.json(
         {
           success: false,
-          error: "Wapio API key is not configured",
+          error: "WAPIO_SESSION_KEY is missing",
+        },
+        { status: 500 }
+      )
+    }
+
+    if (!sessionId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "WAPIO_SESSION_ID is missing",
         },
         { status: 500 }
       )
@@ -35,10 +44,11 @@ export async function POST(request: Request) {
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${wapioKey}`,
+          Authorization: `Bearer ${sessionKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          session_id: sessionId,
           to: String(to).replace(/\D/g, ""),
           text,
         }),
