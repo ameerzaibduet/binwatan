@@ -1,162 +1,124 @@
-
 import { NextResponse } from "next/server"
 import crypto from "crypto"
 
 export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
 
 /**
- * ============================================================
+ * =========================================================
  * WAPIO WEBHOOK
- * ============================================================
+ * =========================================================
  *
- * Handles:
- * - messages.received
- * - personal.message.received
- * - messages.sent
- * - messages.update
- * - message-receipt.update
- * - session.status
- * - qr.updated
- * - unknown/future events
+ * Environment variable required:
  *
- * Security:
- * - Reads the RAW request body
- * - Verifies X-Webhook-Signature using HMAC SHA-256
- * - Uses timingSafeEqual for comparison
+ * WAPIO_WEBHOOK_SECRET=your_webhook_secret
  *
- * Message protection:
- * - Ignores our own messages (fromMe === true)
- * - Ignores WhatsApp groups (@g.us)
- *
- * Future:
- * - Confirm Order
- * - Cancel Order
- * - Need Help
- * - Supabase order updates
- * ============================================================
- */
-
-
-/**
- * ------------------------------------------------------------
- * SIGNATURE VERIFICATION
- * ------------------------------------------------------------
- *
- * Wapio signs the RAW webhook request body using:
- *
- * HMAC-SHA256
- *
- * Secret:
- * WAPIO_WEBHOOK_SECRET
- *
- * Header:
- * X-Webhook-Signature
+ * This endpoint:
+ * - Verifies Wapio HMAC signature
+ * - Handles incoming WhatsApp messages
+ * - Handles message receipts/status
+ * - Handles session status
+ * - Handles QR updates
+ * - Ignores messages sent by our own account
+ * - Ignores WhatsApp groups
  *
  * IMPORTANT:
- * Do NOT JSON.parse() the body before calculating
- * the signature.
+ * The raw request body MUST be used for signature verification.
+ * =========================================================
  */
+
 function verifyWapioSignature(
   rawBody: string,
-  receivedSignature: string | null
+  signatureHeader: string,
+  secret: string
 ): boolean {
-  const secret = process.env.WAPIO_WEBHOOK_SECRET
-
-  if (!secret) {
-    console.error(
-      "[WAPIO WEBHOOK] ERROR: WAPIO_WEBHOOK_SECRET is missing"
-    )
-
-    return false
-  }
-
-  if (!receivedSignature) {
-    console.error(
-      "[WAPIO WEBHOOK] ERROR: X-Webhook-Signature header is missing"
-    )
-
-    return false
-  }
-
-  /**
-   * Calculate expected HMAC.
-   */
-  const expectedSignature = crypto
-    .createHmac("sha256", secret)
-    .update(rawBody, "utf8")
-    .digest("hex")
-
-  /**
-   * Wapio's signature is expected to be the SHA-256
-   * HMAC value.
-   *
-   * We also safely handle a possible:
-   *
-   * sha256=<hash>
-   *
-   * format if the provider includes that prefix.
-   */
-  const normalizedSignature =
-    receivedSignature.trim().replace(/^sha256=/i, "")
-
-  /**
-   * Log only prefixes.
-   *
-   * NEVER log the complete signature or secret.
-   */
-  console.log(
-    "[WAPIO WEBHOOK] Received signature prefix:",
-    normalizedSignature.substring(0, 16)
-  )
-
-  console.log(
-    "[WAPIO WEBHOOK] Expected signature prefix:",
-    expectedSignature.substring(0, 16)
-  )
-
-  /**
-   * HMAC SHA-256 hex digest must be 64 characters.
-   *
-   * timingSafeEqual throws when Buffer lengths differ,
-   * so check length first.
-   */
-  if (
-    normalizedSignature.length !==
-    expectedSignature.length
-  ) {
-    console.error(
-      "[WAPIO WEBHOOK] Invalid signature length"
-    )
-
-    return false
-  }
-
   try {
-    const receivedBuffer = Buffer.from(
-      normalizedSignature,
-      "utf8"
-    )
+    if (!signatureHeader || !secret) {
+      return false
+    }
 
+    /**
+     * Wapio signature format:
+     *
+     * t=1789162034,v1=d94324...
+     */
+
+    const parts = signatureHeader.split(",")
+
+    let timestamp = ""
+    let receivedSignature = ""
+
+    for (const part of parts) {
+      const separatorIndex = part.indexOf("=")
+
+      if (separatorIndex === -1) {
+        continue
+      }
+
+      const key = part
+        .slice(0, separatorIndex)
+        .trim()
+
+      const value = part
+        .slice(separatorIndex + 1)
+        .trim()
+
+      if (key === "t") {
+        timestamp = value
+      }
+
+      if (key === "v1") {
+        receivedSignature = value
+      }
+    }
+
+    if (!timestamp || !receivedSignature) {
+      console.error(
+        "Wapio webhook: signature missing timestamp or v1"
+      )
+
+      return false
+    }
+
+    /**
+     * Wapio signs:
+     *
+     * timestamp + "." + rawBody
+     */
+    const signedPayload = `${timestamp}.${rawBody}`
+
+    const expectedSignature = crypto
+      .createHmac("sha256", secret)
+      .update(signedPayload)
+      .digest("hex")
+
+    /**
+     * Prevent timing attacks.
+     */
     const expectedBuffer = Buffer.from(
       expectedSignature,
       "utf8"
     )
 
-    const valid = crypto.timingSafeEqual(
-      receivedBuffer,
-      expectedBuffer
+    const receivedBuffer = Buffer.from(
+      receivedSignature,
+      "utf8"
     )
 
-    if (!valid) {
-      console.error(
-        "[WAPIO WEBHOOK] Invalid webhook signature"
-      )
+    if (
+      expectedBuffer.length !==
+      receivedBuffer.length
+    ) {
+      return false
     }
 
-    return valid
+    return crypto.timingSafeEqual(
+      expectedBuffer,
+      receivedBuffer
+    )
   } catch (error) {
     console.error(
-      "[WAPIO WEBHOOK] Signature comparison failed:",
+      "Wapio signature verification error:",
       error
     )
 
@@ -164,154 +126,79 @@ function verifyWapioSignature(
   }
 }
 
-
 /**
- * ------------------------------------------------------------
- * MESSAGE EXTRACTION
- * ------------------------------------------------------------
- *
- * Wapio message events use:
- *
- * payload.data.messages
- *
- * and the message key contains:
- *
- * key.fromMe
- * key.remoteJid
- *
- * We keep this function flexible because different
- * message types may not contain exactly the same fields.
- */
-function extractIncomingMessage(payload: any) {
-  const message = payload?.data?.messages
-
-  if (!message) {
-    return null
-  }
-
-  const key = message?.key || {}
-
-  return {
-    id:
-      message?.id ||
-      key?.id ||
-      null,
-
-    messageBody:
-      typeof message?.messageBody === "string"
-        ? message.messageBody
-        : typeof message?.message?.conversation === "string"
-        ? message.message.conversation
-        : "",
-
-    messageTimestamp:
-      message?.messageTimestamp ||
-      message?.messageTimestampMs ||
-      null,
-
-    pushName:
-      typeof message?.pushName === "string"
-        ? message.pushName
-        : "",
-
-    remoteJid:
-      typeof message?.remoteJid === "string"
-        ? message.remoteJid
-        : typeof key?.remoteJid === "string"
-        ? key.remoteJid
-        : null,
-
-    senderPn:
-      typeof key?.senderPn === "string"
-        ? key.senderPn
-        : null,
-
-    cleanedSenderPn:
-      typeof key?.cleanedSenderPn === "string"
-        ? key.cleanedSenderPn
-        : null,
-
-    senderLid:
-      typeof key?.senderLid === "string"
-        ? key.senderLid
-        : null,
-
-    /**
-     * IMPORTANT:
-     *
-     * true  = message was sent by our WhatsApp account
-     * false = message came from customer
-     */
-    fromMe:
-      key?.fromMe === true,
-  }
-}
-
-
-/**
- * ------------------------------------------------------------
+ * =========================================================
  * POST
- * ------------------------------------------------------------
+ * =========================================================
  */
 export async function POST(request: Request) {
-  const receivedAt = new Date().toISOString()
-
-  console.log(
-    "=================================================="
-  )
-
-  console.log(
-    "[WAPIO WEBHOOK] Incoming webhook:",
-    receivedAt
-  )
-
   try {
     /**
-     * --------------------------------------------------------
+     * -------------------------------------------------------
      * 1. READ RAW BODY
-     * --------------------------------------------------------
+     * -------------------------------------------------------
      *
-     * MUST happen before JSON.parse().
-     *
-     * The HMAC signature is calculated against the exact
-     * raw request body.
+     * DO NOT use request.json() before signature verification.
      */
     const rawBody = await request.text()
 
     /**
-     * --------------------------------------------------------
-     * 2. READ SIGNATURE
-     * --------------------------------------------------------
+     * -------------------------------------------------------
+     * 2. GET WAPIO SIGNATURE
+     * -------------------------------------------------------
      */
-    const signature =
-      request.headers.get("x-webhook-signature")
-
-    console.log(
-      "[WAPIO WEBHOOK] Signature present:",
-      Boolean(signature)
-    )
+    const signatureHeader =
+      request.headers.get(
+        "x-webhook-signature"
+      ) || ""
 
     /**
-     * --------------------------------------------------------
-     * 3. VERIFY SIGNATURE
-     * --------------------------------------------------------
+     * -------------------------------------------------------
+     * 3. GET WEBHOOK SECRET
+     * -------------------------------------------------------
+     */
+    const secret =
+      process.env.WAPIO_WEBHOOK_SECRET
+
+    if (!secret) {
+      console.error(
+        "Wapio webhook error: WAPIO_WEBHOOK_SECRET is missing"
+      )
+
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Webhook secret is not configured",
+        },
+        {
+          status: 500,
+        }
+      )
+    }
+
+    /**
+     * -------------------------------------------------------
+     * 4. VERIFY SIGNATURE
+     * -------------------------------------------------------
      */
     const validSignature =
       verifyWapioSignature(
         rawBody,
-        signature
+        signatureHeader,
+        secret
       )
 
-    /**
-     * NEVER process an unsigned/invalid webhook.
-     */
     if (!validSignature) {
       console.error(
-        "[WAPIO WEBHOOK] Request rejected: invalid signature"
+        "Wapio webhook: INVALID SIGNATURE"
       )
 
-      console.log(
-        "=================================================="
+      /**
+       * Don't expose the complete signature.
+       */
+      console.error(
+        "Signature prefix:",
+        signatureHeader.substring(0, 25) + "..."
       )
 
       return NextResponse.json(
@@ -325,33 +212,24 @@ export async function POST(request: Request) {
       )
     }
 
-    console.log(
-      "[WAPIO WEBHOOK] Signature verified successfully"
-    )
-
     /**
-     * --------------------------------------------------------
-     * 4. PARSE JSON
-     * --------------------------------------------------------
+     * -------------------------------------------------------
+     * 5. PARSE JSON
+     * -------------------------------------------------------
      */
     let payload: any
 
     try {
       payload = JSON.parse(rawBody)
-    } catch (error) {
+    } catch {
       console.error(
-        "[WAPIO WEBHOOK] Invalid JSON payload:",
-        error
-      )
-
-      console.log(
-        "=================================================="
+        "Wapio webhook: invalid JSON"
       )
 
       return NextResponse.json(
         {
           success: false,
-          error: "Invalid JSON payload",
+          error: "Invalid JSON",
         },
         {
           status: 400,
@@ -360,258 +238,317 @@ export async function POST(request: Request) {
     }
 
     /**
-     * --------------------------------------------------------
-     * 5. GET EVENT INFORMATION
-     * --------------------------------------------------------
+     * -------------------------------------------------------
+     * 6. EVENT INFORMATION
+     * -------------------------------------------------------
      */
     const event =
-      typeof payload?.event === "string"
-        ? payload.event
-        : "unknown"
+      payload?.event ||
+      request.headers.get(
+        "x-webhook-event"
+      ) ||
+      ""
 
-    const sessionId =
-      payload?.sessionId ||
-      payload?.session_id ||
-      null
+    const deliveryId =
+      request.headers.get(
+        "x-webhook-delivery-id"
+      ) || ""
 
+    const eventId =
+      request.headers.get(
+        "x-webhook-event-id"
+      ) || ""
+
+    const attempt =
+      request.headers.get(
+        "x-webhook-attempt"
+      ) || ""
+
+    const totalAttempts =
+      request.headers.get(
+        "x-webhook-total-attempts"
+      ) || ""
+
+    console.log("")
     console.log(
-      "[WAPIO WEBHOOK] Event:",
-      event
+      "=========================================="
     )
-
     console.log(
-      "[WAPIO WEBHOOK] Session:",
-      sessionId
+      "       WAPIO WEBHOOK RECEIVED"
     )
-
+    console.log(
+      "=========================================="
+    )
+    console.log("Event:", event)
+    console.log("Event ID:", eventId)
+    console.log("Delivery ID:", deliveryId)
+    console.log(
+      "Attempt:",
+      `${attempt}/${totalAttempts}`
+    )
+    console.log(
+      "=========================================="
+    )
 
     /**
-     * ========================================================
-     * INCOMING CUSTOMER MESSAGES
-     * ========================================================
+     * =======================================================
+     * INCOMING MESSAGES
+     * =======================================================
+     *
+     * These are the events we care about for:
+     *
+     * - Customer messages
+     * - Order confirmation
+     * - Cancel order
+     * - Need help
+     * - Product questions
+     * - Catalogue requests
      */
     if (
       event === "messages.received" ||
-      event === "personal.message.received"
+      event === "personal.message.received" ||
+      event === "messages.upsert"
     ) {
-      const message =
-        extractIncomingMessage(payload)
+      const messages =
+        payload?.data?.messages
 
       /**
-       * ------------------------------------------------------
-       * No message object
-       * ------------------------------------------------------
+       * Wapio may provide:
+       *
+       * data.messages
+       *
+       * as an object or array.
        */
-      if (!message) {
-        console.warn(
-          "[WAPIO WEBHOOK] Message event received but no message data found"
-        )
+      const messageList = Array.isArray(
+        messages
+      )
+        ? messages
+        : messages
+          ? [messages]
+          : []
 
-        console.log(
-          "=================================================="
-        )
+      console.log(
+        "Incoming message count:",
+        messageList.length
+      )
 
-        return NextResponse.json(
-          {
-            success: true,
-            received: true,
-            processed: false,
-            reason: "No message data",
-          },
-          {
-            status: 200,
+      for (const message of messageList) {
+        try {
+          const key =
+            message?.key || {}
+
+          /**
+           * ---------------------------------------------------
+           * FROM ME
+           * ---------------------------------------------------
+           *
+           * Ignore messages sent by our own WhatsApp.
+           *
+           * This prevents:
+           *
+           * our message
+           * -> webhook
+           * -> automation
+           * -> another message
+           * -> webhook
+           * -> loop
+           */
+          const fromMe =
+            Boolean(key?.fromMe)
+
+          if (fromMe) {
+            console.log(
+              "Ignoring outgoing message from our own account"
+            )
+
+            continue
           }
-        )
+
+          /**
+           * ---------------------------------------------------
+           * REMOTE JID
+           * ---------------------------------------------------
+           */
+          const remoteJid =
+            key?.remoteJid ||
+            message?.remoteJid ||
+            ""
+
+          /**
+           * ---------------------------------------------------
+           * GROUP MESSAGE
+           * ---------------------------------------------------
+           */
+          if (
+            typeof remoteJid === "string" &&
+            remoteJid.endsWith("@g.us")
+          ) {
+            console.log(
+              "Ignoring WhatsApp group message:",
+              remoteJid
+            )
+
+            continue
+          }
+
+          /**
+           * ---------------------------------------------------
+           * PHONE NUMBER
+           * ---------------------------------------------------
+           *
+           * IMPORTANT:
+           *
+           * Wapio/WhatsApp can provide @lid instead of a
+           * normal phone JID.
+           *
+           * Therefore DON'T assume:
+           *
+           * remoteJid = phone number
+           *
+           * We check senderPn first.
+           */
+          const senderPn =
+            key?.senderPn ||
+            message?.senderPn ||
+            ""
+
+          const cleanedSenderPn =
+            senderPn
+              ? String(senderPn).replace(
+                  /\D/g,
+                  ""
+                )
+              : ""
+
+          /**
+           * LID
+           */
+          const senderLid =
+            key?.senderLid ||
+            message?.senderLid ||
+            ""
+
+          /**
+           * ---------------------------------------------------
+           * MESSAGE TEXT
+           * ---------------------------------------------------
+           */
+          const messageText =
+            message?.message
+              ?.conversation ||
+            message?.message
+              ?.extendedTextMessage
+              ?.text ||
+            message?.message
+              ?.imageMessage
+              ?.caption ||
+            message?.message
+              ?.videoMessage
+              ?.caption ||
+            message?.text ||
+            ""
+
+          /**
+           * ---------------------------------------------------
+           * MESSAGE ID
+           * ---------------------------------------------------
+           */
+          const messageId =
+            key?.id ||
+            message?.id ||
+            ""
+
+          /**
+           * ---------------------------------------------------
+           * LOG
+           * ---------------------------------------------------
+           */
+          console.log("")
+          console.log(
+            "----- CUSTOMER MESSAGE -----"
+          )
+          console.log(
+            "Message ID:",
+            messageId
+          )
+          console.log(
+            "Remote JID:",
+            remoteJid
+          )
+          console.log(
+            "Phone:",
+            cleanedSenderPn
+          )
+          console.log(
+            "LID:",
+            senderLid
+          )
+          console.log(
+            "Message:",
+            messageText
+          )
+          console.log(
+            "-----------------------------"
+          )
+
+          /**
+           * =================================================
+           * FUTURE ORDER AUTOMATION
+           * =================================================
+           *
+           * Here we can later add:
+           *
+           * CONFIRM ORDER
+           * CANCEL ORDER
+           * NEED HELP
+           *
+           * Example:
+           *
+           * const normalizedText =
+           *   String(messageText)
+           *     .trim()
+           *     .toLowerCase()
+           *
+           * if (
+           *   normalizedText === "confirm"
+           * ) {
+           *   // Update order confirmation
+           * }
+           *
+           * if (
+           *   normalizedText === "cancel"
+           * ) {
+           *   // Cancel order
+           * }
+           *
+           * if (
+           *   normalizedText === "need help"
+           * ) {
+           *   // Notify team
+           * }
+           */
+
+        } catch (messageError) {
+          /**
+           * Don't let one malformed message cause
+           * the entire Wapio webhook to fail.
+           */
+          console.error(
+            "Error processing individual message:",
+            messageError
+          )
+        }
       }
 
-
       /**
-       * ------------------------------------------------------
-       * IGNORE OUR OWN OUTGOING MESSAGES
-       * ------------------------------------------------------
-       *
-       * This is extremely important.
-       *
-       * Without this protection:
-       *
-       * Website → Wapio → WhatsApp
-       *                 ↓
-       *              webhook
-       *                 ↓
-       * Website → Wapio → WhatsApp
-       *
-       * could create a reply loop.
-       */
-      if (message.fromMe) {
-        console.log(
-          "[WAPIO WEBHOOK] Ignoring outgoing message from our own account"
-        )
-
-        console.log(
-          "[WAPIO WEBHOOK] Message ID:",
-          message.id
-        )
-
-        console.log(
-          "=================================================="
-        )
-
-        return NextResponse.json(
-          {
-            success: true,
-            received: true,
-            processed: false,
-            reason: "Outgoing message ignored",
-          },
-          {
-            status: 200,
-          }
-        )
-      }
-
-
-      /**
-       * ------------------------------------------------------
-       * IGNORE GROUP MESSAGES
-       * ------------------------------------------------------
-       *
-       * WhatsApp group JIDs end with:
-       *
-       * @g.us
-       */
-      if (
-        typeof message.remoteJid === "string" &&
-        message.remoteJid.endsWith("@g.us")
-      ) {
-        console.log(
-          "[WAPIO WEBHOOK] Ignoring WhatsApp group message"
-        )
-
-        console.log(
-          "[WAPIO WEBHOOK] Group JID:",
-          message.remoteJid
-        )
-
-        console.log(
-          "=================================================="
-        )
-
-        return NextResponse.json(
-          {
-            success: true,
-            received: true,
-            processed: false,
-            reason: "Group message ignored",
-          },
-          {
-            status: 200,
-          }
-        )
-      }
-
-
-      /**
-       * ======================================================
-       * CUSTOMER MESSAGE
-       * ======================================================
-       */
-      const customerPhone =
-        message.cleanedSenderPn ||
-        message.senderPn ||
-        null
-
-      console.log(
-        "[WAPIO WEBHOOK] CUSTOMER MESSAGE"
-      )
-
-      console.log(
-        "[WAPIO WEBHOOK] Message ID:",
-        message.id
-      )
-
-      console.log(
-        "[WAPIO WEBHOOK] Customer:",
-        message.pushName || "Unknown"
-      )
-
-      console.log(
-        "[WAPIO WEBHOOK] Phone:",
-        customerPhone || "Unknown"
-      )
-
-      console.log(
-        "[WAPIO WEBHOOK] Remote JID:",
-        message.remoteJid || "Unknown"
-      )
-
-      console.log(
-        "[WAPIO WEBHOOK] Message:",
-        message.messageBody || "[non-text message]"
-      )
-
-      console.log(
-        "[WAPIO WEBHOOK] From me:",
-        message.fromMe
-      )
-
-
-      /**
-       * ======================================================
-       * FUTURE BIN WATAN AUTOMATION
-       * ======================================================
-       *
-       * This is where we will later handle:
-       *
-       * Confirm Order
-       * Cancel Order
-       * Need Help
-       * Customer replies
-       * Address corrections
-       * Product picture requests
-       *
-       * Example future logic:
-       *
-       * if (message.messageBody === "CONFIRM_ORDER") {
-       *   // Find order
-       *   // Update order_status = "confirmed"
-       * }
-       *
-       * if (message.messageBody === "CANCEL_ORDER") {
-       *   // Find order
-       *   // Update order_status = "cancelled"
-       * }
-       *
        * IMPORTANT:
-       * Do not put heavy processing here yet.
-       *
-       * First make sure Wapio webhook delivery is reliable.
-       */
-
-
-      console.log(
-        "[WAPIO WEBHOOK] Customer message received successfully"
-      )
-
-      console.log(
-        "=================================================="
-      )
-
-      /**
-       * Wapio should receive a 200 quickly.
+       * Return 200 quickly.
        */
       return NextResponse.json(
         {
           success: true,
           received: true,
-          processed: true,
           event,
-          message: {
-            id: message.id,
-            phone: customerPhone,
-            pushName: message.pushName,
-            remoteJid: message.remoteJid,
-            messageBody: message.messageBody,
-          },
         },
         {
           status: 200,
@@ -619,48 +556,96 @@ export async function POST(request: Request) {
       )
     }
 
-
     /**
-     * ========================================================
-     * OUTGOING / MESSAGE STATUS EVENTS
-     * ========================================================
+     * =======================================================
+     * MESSAGE RECEIPT / STATUS
+     * =======================================================
+     *
+     * Example payload you received:
+     *
+     * {
+     *   "event": "message-receipt.update",
+     *   "data": {
+     *     "key": {
+     *       "fromMe": false,
+     *       "id": "...",
+     *       "remoteJid": "...@lid"
+     *     },
+     *     "messageTimestamp": 1789162034,
+     *     "status": 4
+     *   }
+     * }
      */
     if (
-      event === "messages.sent" ||
+      event ===
+        "message-receipt.update" ||
+      event ===
+        "messages.receipt.update" ||
       event === "messages.update" ||
-      event === "message-receipt.update" ||
-      event === "messages.receipt.update"
+      event === "messages.sent"
+    ) {
+      const data =
+        payload?.data || {}
+
+      const key =
+        data?.key || {}
+
+      console.log("")
+      console.log(
+        "----- WAPIO MESSAGE STATUS -----"
+      )
+      console.log(
+        "Message ID:",
+        key?.id || ""
+      )
+      console.log(
+        "Remote JID:",
+        key?.remoteJid || ""
+      )
+      console.log(
+        "From Me:",
+        key?.fromMe ?? ""
+      )
+      console.log(
+        "Status:",
+        data?.status ?? ""
+      )
+      console.log(
+        "--------------------------------"
+      )
+
+      /**
+       * We don't need to do anything else here.
+       */
+      return NextResponse.json(
+        {
+          success: true,
+          received: true,
+          event,
+        },
+        {
+          status: 200,
+        }
+      )
+    }
+
+    /**
+     * =======================================================
+     * SESSION STATUS
+     * =======================================================
+     */
+    if (
+      event === "session.status"
     ) {
       console.log(
-        "[WAPIO WEBHOOK] Message/status event received:",
-        event
-      )
-
-      /**
-       * Do NOT dump secrets/signatures.
-       *
-       * Payload data is okay for debugging, but keep logs
-       * reasonable in production.
-       */
-      console.log(
-        "[WAPIO WEBHOOK] Data:",
-        JSON.stringify(
-          payload?.data ?? {},
-          null,
-          2
-        )
-      )
-
-      console.log(
-        "=================================================="
+        "Wapio session status:",
+        payload?.data || payload
       )
 
       return NextResponse.json(
         {
           success: true,
           received: true,
-          processed: false,
-          reason: "Message status event received",
           event,
         },
         {
@@ -669,40 +654,22 @@ export async function POST(request: Request) {
       )
     }
 
-
     /**
-     * ========================================================
-     * SESSION EVENTS
-     * ========================================================
+     * =======================================================
+     * QR UPDATED
+     * =======================================================
      */
     if (
-      event === "session.status" ||
       event === "qr.updated"
     ) {
       console.log(
-        "[WAPIO WEBHOOK] Session event:",
-        event
-      )
-
-      console.log(
-        "[WAPIO WEBHOOK] Data:",
-        JSON.stringify(
-          payload?.data ?? {},
-          null,
-          2
-        )
-      )
-
-      console.log(
-        "=================================================="
+        "Wapio QR updated"
       )
 
       return NextResponse.json(
         {
           success: true,
           received: true,
-          processed: false,
-          reason: "Session event received",
           event,
         },
         {
@@ -711,39 +678,25 @@ export async function POST(request: Request) {
       )
     }
 
-
     /**
-     * ========================================================
-     * UNKNOWN / FUTURE EVENT
-     * ========================================================
+     * =======================================================
+     * UNKNOWN EVENT
+     * =======================================================
      *
-     * If Wapio adds a new event, we still acknowledge it
-     * rather than causing unnecessary webhook retries.
+     * If Wapio sends another valid signed event,
+     * acknowledge it instead of returning an error.
+     *
+     * This prevents unnecessary retries/dead-lettering.
      */
     console.log(
-      "[WAPIO WEBHOOK] Unhandled event:",
+      "Unhandled Wapio event:",
       event
-    )
-
-    console.log(
-      "[WAPIO WEBHOOK] Payload:",
-      JSON.stringify(
-        payload,
-        null,
-        2
-      )
-    )
-
-    console.log(
-      "=================================================="
     )
 
     return NextResponse.json(
       {
         success: true,
         received: true,
-        processed: false,
-        reason: "Event acknowledged",
         event,
       },
       {
@@ -752,28 +705,19 @@ export async function POST(request: Request) {
     )
   } catch (error) {
     /**
-     * ========================================================
+     * -------------------------------------------------------
      * FATAL ERROR
-     * ========================================================
-     *
-     * A real server-side failure occurred.
-     *
-     * Returning 500 allows Wapio to retry according to its
-     * webhook delivery behaviour.
+     * -------------------------------------------------------
      */
     console.error(
-      "[WAPIO WEBHOOK] Fatal error:",
+      "Wapio webhook fatal error:",
       error
-    )
-
-    console.log(
-      "=================================================="
     )
 
     return NextResponse.json(
       {
         success: false,
-        error: "Webhook processing failed",
+        error: "Internal webhook error",
       },
       {
         status: 500,
@@ -782,3 +726,22 @@ export async function POST(request: Request) {
   }
 }
 
+/**
+ * =========================================================
+ * GET
+ * =========================================================
+ *
+ * Useful for quickly checking whether the endpoint exists.
+ */
+export async function GET() {
+  return NextResponse.json(
+    {
+      success: true,
+      message:
+        "Bin Watan Wapio webhook is active",
+    },
+    {
+      status: 200,
+    }
+  )
+}
