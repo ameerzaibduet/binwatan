@@ -21,6 +21,7 @@ import {
   AlertCircle,
   Loader2,
   Ban,
+  Hash,
 } from "lucide-react"
 
 type OrderStatus =
@@ -76,7 +77,7 @@ type FilterStatus =
   | "cancelled"
   | "dispatched"
 
-const PAGE_SIZE = 20
+const PAGE_SIZE = 50
 
 const RAIN_CATEGORIES = [
   "rain suit",
@@ -144,6 +145,26 @@ function getStatusClasses(order: Order) {
   return "bg-orange-50 text-orange-700 border-orange-200"
 }
 
+// Left accent stripe + card ring color per order state — this is the primary
+// way orders are told apart at a glance, so it needs to read before the badge does.
+function getAccentClasses(order: Order) {
+  if (order.dispatched) {
+    return { stripe: "bg-sky-500", ring: "hover:border-sky-200" }
+  }
+
+  const status = getOrderStatus(order)
+
+  if (status === "confirmed") {
+    return { stripe: "bg-emerald-500", ring: "hover:border-emerald-200" }
+  }
+
+  if (status === "cancelled") {
+    return { stripe: "bg-rose-500", ring: "hover:border-rose-200" }
+  }
+
+  return { stripe: "bg-amber-500", ring: "hover:border-amber-200" }
+}
+
 function getProductDetails(order: Order) {
   if (!order.items?.length) {
     return "Order"
@@ -178,6 +199,40 @@ function formatDate(date: string) {
     dateStyle: "medium",
     timeStyle: "short",
   })
+}
+
+// Compact, front-and-center version for the card header: "Today · 4:32 PM"
+function formatCardDate(dateStr: string) {
+  if (!dateStr) {
+    return "-"
+  }
+
+  const date = new Date(dateStr)
+  const now = new Date()
+
+  const isSameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+
+  const yesterday = new Date(now)
+  yesterday.setDate(now.getDate() - 1)
+
+  const time = date.toLocaleTimeString("en-PK", {
+    hour: "numeric",
+    minute: "2-digit",
+  })
+
+  if (isSameDay(date, now)) return `Today · ${time}`
+  if (isSameDay(date, yesterday)) return `Yesterday · ${time}`
+
+  const day = date.toLocaleDateString("en-PK", {
+    day: "numeric",
+    month: "short",
+    year: date.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
+  })
+
+  return `${day} · ${time}`
 }
 
 export default function AdminOrdersPage() {
@@ -1101,19 +1156,19 @@ export default function AdminOrdersPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-3 sm:p-5 lg:p-6">
+    <div className="min-h-screen bg-[#f6f5f2] p-3 sm:p-5 lg:p-6">
       <div className="mx-auto max-w-[1600px]">
 
         {/* HEADER */}
 
         <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">
-              Orders
+            <h1 className="text-2xl font-black tracking-tight text-gray-900 sm:text-3xl">
+              Dispatch Board
             </h1>
 
             <p className="mt-1 text-sm text-gray-500">
-              Manage all orders, confirmations and shipments
+              Every order, its status, and what it needs next
             </p>
           </div>
 
@@ -1154,7 +1209,7 @@ export default function AdminOrdersPage() {
           </div>
         )}
 
-        {/* STATS */}
+        {/* STATS — each tile carries the same accent color as the cards it filters to */}
 
         <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
 
@@ -1162,13 +1217,17 @@ export default function AdminOrdersPage() {
             onClick={() =>
               setFilterStatus("all")
             }
-            className="rounded-xl border bg-white p-4 text-left shadow-sm hover:shadow-md"
+            className={`rounded-xl border-2 bg-white p-4 text-left shadow-sm transition ${
+              filterStatus === "all"
+                ? "border-gray-900"
+                : "border-transparent hover:border-gray-200"
+            }`}
           >
-            <p className="text-xs font-semibold uppercase text-gray-500">
-              All Orders
+            <p className="text-xs font-semibold text-gray-500">
+              All orders
             </p>
 
-            <p className="mt-1 text-2xl font-bold">
+            <p className="mt-1 text-2xl font-black text-gray-900">
               {stats.total}
             </p>
           </button>
@@ -1177,13 +1236,17 @@ export default function AdminOrdersPage() {
             onClick={() =>
               setFilterStatus("pending")
             }
-            className="rounded-xl border border-orange-100 bg-white p-4 text-left shadow-sm hover:shadow-md"
+            className={`rounded-xl border-2 bg-white p-4 text-left shadow-sm transition ${
+              filterStatus === "pending"
+                ? "border-amber-500"
+                : "border-transparent hover:border-amber-200"
+            }`}
           >
-            <p className="text-xs font-semibold uppercase text-orange-600">
+            <p className="text-xs font-semibold text-amber-600">
               Pending
             </p>
 
-            <p className="mt-1 text-2xl font-bold">
+            <p className="mt-1 text-2xl font-black text-gray-900">
               {stats.pending}
             </p>
           </button>
@@ -1192,13 +1255,17 @@ export default function AdminOrdersPage() {
             onClick={() =>
               setFilterStatus("confirmed")
             }
-            className="rounded-xl border border-green-100 bg-white p-4 text-left shadow-sm hover:shadow-md"
+            className={`rounded-xl border-2 bg-white p-4 text-left shadow-sm transition ${
+              filterStatus === "confirmed"
+                ? "border-emerald-500"
+                : "border-transparent hover:border-emerald-200"
+            }`}
           >
-            <p className="text-xs font-semibold uppercase text-green-600">
+            <p className="text-xs font-semibold text-emerald-600">
               Confirmed
             </p>
 
-            <p className="mt-1 text-2xl font-bold">
+            <p className="mt-1 text-2xl font-black text-gray-900">
               {stats.confirmed}
             </p>
           </button>
@@ -1207,13 +1274,17 @@ export default function AdminOrdersPage() {
             onClick={() =>
               setFilterStatus("cancelled")
             }
-            className="rounded-xl border border-red-100 bg-white p-4 text-left shadow-sm hover:shadow-md"
+            className={`rounded-xl border-2 bg-white p-4 text-left shadow-sm transition ${
+              filterStatus === "cancelled"
+                ? "border-rose-500"
+                : "border-transparent hover:border-rose-200"
+            }`}
           >
-            <p className="text-xs font-semibold uppercase text-red-600">
+            <p className="text-xs font-semibold text-rose-600">
               Cancelled
             </p>
 
-            <p className="mt-1 text-2xl font-bold">
+            <p className="mt-1 text-2xl font-black text-gray-900">
               {stats.cancelled}
             </p>
           </button>
@@ -1224,13 +1295,17 @@ export default function AdminOrdersPage() {
                 "dispatched"
               )
             }
-            className="rounded-xl border border-blue-100 bg-white p-4 text-left shadow-sm hover:shadow-md"
+            className={`rounded-xl border-2 bg-white p-4 text-left shadow-sm transition ${
+              filterStatus === "dispatched"
+                ? "border-sky-500"
+                : "border-transparent hover:border-sky-200"
+            }`}
           >
-            <p className="text-xs font-semibold uppercase text-blue-600">
+            <p className="text-xs font-semibold text-sky-600">
               Dispatched
             </p>
 
-            <p className="mt-1 text-2xl font-bold">
+            <p className="mt-1 text-2xl font-black text-gray-900">
               {stats.dispatched}
             </p>
           </button>
@@ -1291,642 +1366,294 @@ export default function AdminOrdersPage() {
           </div>
         </div>
 
-        {/* ORDERS TABLE */}
+        {/* ORDER CARDS — one box per order, same layout at every screen size */}
 
-        <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
-
-          {loading ? (
-            <div className="flex min-h-[400px] items-center justify-center">
-              <div className="flex items-center gap-2 text-gray-500">
-                <Loader2 className="h-5 w-5 animate-spin" />
-                Loading orders...
-              </div>
+        {loading ? (
+          <div className="flex min-h-[400px] items-center justify-center rounded-xl border bg-white shadow-sm">
+            <div className="flex items-center gap-2 text-gray-500">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              Loading orders...
             </div>
-          ) : currentPageOrders.length === 0 ? (
-            <div className="flex min-h-[400px] flex-col items-center justify-center text-center">
-              <Package className="mb-3 h-10 w-10 text-gray-300" />
+          </div>
+        ) : currentPageOrders.length === 0 ? (
+          <div className="flex min-h-[400px] flex-col items-center justify-center rounded-xl border bg-white text-center shadow-sm">
+            <Package className="mb-3 h-10 w-10 text-gray-300" />
 
-              <h3 className="font-semibold text-gray-900">
-                No orders found
-              </h3>
+            <h3 className="font-semibold text-gray-900">
+              No orders found
+            </h3>
 
-              <p className="mt-1 text-sm text-gray-500">
-                No orders match the selected filter.
-              </p>
-            </div>
-          ) : (
-            <>
-              {/* DESKTOP TABLE */}
+            <p className="mt-1 text-sm text-gray-500">
+              No orders match the selected filter.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
 
-              <div className="hidden overflow-x-auto md:block">
-                <table className="w-full min-w-[1250px] text-sm">
+            {currentPageOrders.map(
+              (order) => {
+                const status =
+                  getOrderStatus(order)
 
-                  <thead className="border-b bg-gray-50">
-                    <tr className="text-left text-xs uppercase tracking-wide text-gray-500">
+                const accent =
+                  getAccentClasses(order)
 
-                      <th className="px-4 py-3">
-                        Customer
-                      </th>
+                const confirming =
+                  actionLoading ===
+                  `confirm-${order.id}`
 
-                      <th className="px-4 py-3">
-                        Product
-                      </th>
+                const cancelling =
+                  actionLoading ===
+                  `cancel-${order.id}`
 
-                      <th className="px-4 py-3">
-                        Amount
-                      </th>
+                const booking =
+                  actionLoading ===
+                  `book-${order.id}`
 
-                      <th className="px-4 py-3">
-                        Address
-                      </th>
+                return (
+                  <div
+                    key={order.id}
+                    className={`flex overflow-hidden rounded-xl border-2 border-gray-100 bg-white shadow-sm transition ${accent.ring}`}
+                  >
+                    {/* status stripe */}
+                    <div className={`w-1.5 shrink-0 ${accent.stripe}`} />
 
-                      <th className="px-4 py-3">
-                        Status
-                      </th>
+                    <div className="flex flex-1 flex-col p-4">
 
-                      <th className="px-4 py-3">
-                        Courier
-                      </th>
+                      {/* date first, bold and unmissable */}
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <span className="inline-flex items-center gap-1.5 text-sm font-bold text-gray-900">
+                          <CalendarDays className="h-4 w-4 text-gray-400" />
+                          {formatCardDate(order.created_at)}
+                        </span>
 
-                      <th className="px-4 py-3">
-                        Date
-                      </th>
-
-                      <th className="px-4 py-3 text-right">
-                        Actions
-                      </th>
-
-                    </tr>
-                  </thead>
-
-                  <tbody className="divide-y">
-
-                    {currentPageOrders.map(
-                      (order) => {
-                        const status =
-                          getOrderStatus(
+                        <span
+                          className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${getStatusClasses(
                             order
-                          )
+                          )}`}
+                        >
+                          {order.dispatched ? (
+                            <Truck className="h-3.5 w-3.5" />
+                          ) : status === "confirmed" ? (
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                          ) : status === "cancelled" ? (
+                            <Ban className="h-3.5 w-3.5" />
+                          ) : (
+                            <Clock3 className="h-3.5 w-3.5" />
+                          )}
 
-                        const confirming =
-                          actionLoading ===
-                          `confirm-${order.id}`
+                          {getStatusLabel(order)}
+                        </span>
+                      </div>
 
-                        const cancelling =
-                          actionLoading ===
-                          `cancel-${order.id}`
-
-                        const booking =
-                          actionLoading ===
-                          `book-${order.id}`
-
-                        return (
-                          <tr
-                            key={
-                              order.id
-                            }
-                            className="hover:bg-gray-50"
-                          >
-
-                            {/* CUSTOMER */}
-
-                            <td className="px-4 py-4">
-                              <button
-                                onClick={() =>
-                                  setSelectedOrder(
-                                    order
-                                  )
-                                }
-                                className="text-left"
-                              >
-                                <p className="font-semibold text-gray-900 hover:text-orange-600">
-                                  {
-                                    order.name
-                                  }
-                                </p>
-
-                                <p className="mt-1 text-xs text-gray-500">
-                                  {
-                                    order.phone
-                                  }
-                                </p>
-                              </button>
-                            </td>
-
-                            {/* PRODUCT */}
-
-                            <td className="max-w-[260px] px-4 py-4">
-                              <p className="line-clamp-3 text-gray-700">
-                                {getProductDetails(
-                                  order
-                                )}
-                              </p>
-                            </td>
-
-                            {/* AMOUNT */}
-
-                            <td className="whitespace-nowrap px-4 py-4">
-                              <span className="font-bold">
-                                Rs.{" "}
-                                {formatPrice(
-                                  order.total
-                                )}
-                              </span>
-                            </td>
-
-                            {/* ADDRESS */}
-
-                            <td className="max-w-[230px] px-4 py-4">
-                              <p className="line-clamp-2 text-xs text-gray-600">
-                                {
-                                  order.address
-                                }
-                              </p>
-
-                              <p className="mt-1 text-xs font-semibold text-gray-500">
-                                {
-                                  order.city
-                                }
-                              </p>
-                            </td>
-
-                            {/* STATUS */}
-
-                            <td className="px-4 py-4">
-                              <span
-                                className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${getStatusClasses(
-                                  order
-                                )}`}
-                              >
-                                {order.dispatched ? (
-                                  <Truck className="h-3.5 w-3.5" />
-                                ) : status ===
-                                  "confirmed" ? (
-                                  <CheckCircle2 className="h-3.5 w-3.5" />
-                                ) : status ===
-                                  "cancelled" ? (
-                                  <Ban className="h-3.5 w-3.5" />
-                                ) : (
-                                  <Clock3 className="h-3.5 w-3.5" />
-                                )}
-
-                                {getStatusLabel(
-                                  order
-                                )}
-                              </span>
-                            </td>
-
-                            {/* COURIER */}
-
-                            <td className="px-4 py-4">
-
-                              {order.courier_provider ? (
-                                <span className="text-xs font-semibold uppercase text-gray-600">
-                                  {
-                                    order.courier_provider
-                                  }
-                                </span>
-                              ) : (
-                                <span className="text-xs text-gray-400">
-                                  Not booked
-                                </span>
-                              )}
-
-                              {order.tracking_number && (
-                                <p className="mt-1 font-mono text-xs text-gray-500">
-                                  {
-                                    order.tracking_number
-                                  }
-                                </p>
-                              )}
-
-                            </td>
-
-                            {/* DATE */}
-
-                            <td className="whitespace-nowrap px-4 py-4 text-xs text-gray-500">
-                              {formatDate(
-                                order.created_at
-                              )}
-                            </td>
-
-                            {/* ACTIONS */}
-
-                            <td className="px-4 py-4">
-
-                              <div className="flex items-center justify-end gap-1.5">
-
-                                {/* MANUAL CONFIRM */}
-
-                                {!order.dispatched &&
-                                  status ===
-                                    "pending" && (
-                                    <button
-                                      onClick={() =>
-                                        manuallyConfirmOrder(
-                                          order
-                                        )
-                                      }
-                                      disabled={
-                                        confirming
-                                      }
-                                      title="Manually confirm order"
-                                      className="inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-2 text-xs font-bold text-white hover:bg-green-700 disabled:opacity-50"
-                                    >
-                                      {confirming ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                      ) : (
-                                        <CheckCircle2 className="h-4 w-4" />
-                                      )}
-
-                                      Confirm
-                                    </button>
-                                  )}
-
-                                {/* BOOK */}
-
-                                {!order.dispatched &&
-                                  status ===
-                                    "confirmed" && (
-                                    <button
-                                      onClick={() =>
-                                        bookShipment(
-                                          order
-                                        )
-                                      }
-                                      disabled={
-                                        booking
-                                      }
-                                      title="Book courier shipment"
-                                      className="inline-flex items-center gap-1.5 rounded-lg bg-orange-500 px-3 py-2 text-xs font-bold text-white hover:bg-orange-600 disabled:opacity-50"
-                                    >
-                                      {booking ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                      ) : (
-                                        <Truck className="h-4 w-4" />
-                                      )}
-
-                                      Book
-                                    </button>
-                                  )}
-
-                                {/* CANCEL */}
-
-                                {!order.dispatched &&
-                                  status !==
-                                    "cancelled" && (
-                                    <button
-                                      onClick={() =>
-                                        cancelOrder(
-                                          order
-                                        )
-                                      }
-                                      disabled={
-                                        cancelling
-                                      }
-                                      title="Cancel order"
-                                      className="rounded-lg border border-red-200 p-2 text-red-600 hover:bg-red-50 disabled:opacity-50"
-                                    >
-                                      {cancelling ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                      ) : (
-                                        <Ban className="h-4 w-4" />
-                                      )}
-                                    </button>
-                                  )}
-
-                                {/* EDIT */}
-
-                                <button
-                                  onClick={() =>
-                                    setEditingOrder(
-                                      {
-                                        ...order,
-                                      }
-                                    )
-                                  }
-                                  title="Edit"
-                                  className="rounded-lg border border-gray-200 p-2 text-gray-600 hover:bg-gray-100"
-                                >
-                                  <Pencil className="h-4 w-4" />
-                                </button>
-
-                                {/* DELETE */}
-
-                                <button
-                                  onClick={() =>
-                                    deleteOrder(
-                                      order
-                                    )
-                                  }
-                                  title="Delete"
-                                  className="rounded-lg border border-red-200 p-2 text-red-600 hover:bg-red-50"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </button>
-
-                              </div>
-                            </td>
-
-                          </tr>
-                        )
-                      }
-                    )}
-
-                  </tbody>
-                </table>
-              </div>
-
-              {/* MOBILE */}
-
-              <div className="divide-y md:hidden">
-
-                {currentPageOrders.map(
-                  (order) => {
-                    const status =
-                      getOrderStatus(
-                        order
-                      )
-
-                    const confirming =
-                      actionLoading ===
-                      `confirm-${order.id}`
-
-                    const booking =
-                      actionLoading ===
-                      `book-${order.id}`
-
-                    return (
-                      <div
-                        key={
-                          order.id
+                      {/* customer */}
+                      <button
+                        onClick={() =>
+                          setSelectedOrder(order)
                         }
-                        className="p-4"
+                        className="text-left"
                       >
-
-                        <div className="flex items-start justify-between gap-3">
-
-                          <button
-                            onClick={() =>
-                              setSelectedOrder(
-                                order
-                              )
-                            }
-                            className="min-w-0 text-left"
-                          >
-                            <p className="truncate font-bold text-gray-900">
-                              {
-                                order.name
-                              }
-                            </p>
-
-                            <p className="mt-1 text-sm text-gray-500">
-                              {
-                                order.phone
-                              }
-                            </p>
-                          </button>
-
-                          <span
-                            className={`shrink-0 rounded-full border px-2 py-1 text-[11px] font-semibold ${getStatusClasses(
-                              order
-                            )}`}
-                          >
-                            {
-                              getStatusLabel(
-                                order
-                              )
-                            }
-                          </span>
-
-                        </div>
-
-                        <div className="mt-3 rounded-lg bg-gray-50 p-3">
-
-                          <p className="text-sm font-medium text-gray-800">
-                            {getProductDetails(
-                              order
-                            )}
-                          </p>
-
-                          <div className="mt-2 flex items-center justify-between">
-
-                            <span className="text-xs text-gray-500">
-                              {
-                                order.city
-                              }
-                            </span>
-
-                            <span className="font-bold">
-                              Rs.{" "}
-                              {formatPrice(
-                                order.total
-                              )}
-                            </span>
-
-                          </div>
-                        </div>
-
-                        <p className="mt-2 line-clamp-2 text-xs text-gray-500">
-                          {
-                            order.address
-                          }
+                        <p className="truncate font-bold text-gray-900 hover:text-orange-600">
+                          {order.name}
                         </p>
+                        <p className="mt-0.5 text-xs text-gray-500">
+                          {order.phone}
+                        </p>
+                      </button>
 
-                        {order.tracking_number && (
-                          <div className="mt-2 rounded-lg bg-blue-50 p-2 text-xs text-blue-700">
-                            <b>
-                              Tracking:
-                            </b>{" "}
-                            {
-                              order.tracking_number
-                            }
-                          </div>
+                      {/* product */}
+                      <p className="mt-3 line-clamp-2 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-700">
+                        {getProductDetails(order)}
+                      </p>
+
+                      {/* address */}
+                      <div className="mt-2 flex items-start gap-1.5 text-xs text-gray-500">
+                        <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400" />
+                        <span className="line-clamp-2">
+                          {order.address}, <span className="font-semibold text-gray-600">{order.city}</span>
+                        </span>
+                      </div>
+
+                      {/* courier / tracking */}
+                      {(order.courier_provider || order.tracking_number) && (
+                        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                          {order.courier_provider && (
+                            <span className="font-semibold uppercase text-gray-600">
+                              {order.courier_provider}
+                            </span>
+                          )}
+                          {order.tracking_number && (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 font-mono text-blue-700">
+                              <Hash className="h-3 w-3" />
+                              {order.tracking_number}
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* amount */}
+                      <div className="mt-3 flex items-center justify-between border-t border-dashed border-gray-200 pt-3">
+                        <span className="text-xs font-semibold text-gray-500">
+                          Order #{order.id.slice(0, 8).toUpperCase()}
+                        </span>
+                        <span className="text-base font-black text-gray-900">
+                          Rs. {formatPrice(order.total)}
+                        </span>
+                      </div>
+
+                      {/* actions */}
+                      <div className="mt-3 flex flex-wrap items-center gap-1.5">
+
+                        {!order.dispatched && status === "pending" && (
+                          <button
+                            onClick={() => manuallyConfirmOrder(order)}
+                            disabled={confirming}
+                            title="Manually confirm order"
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                          >
+                            {confirming ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                            )}
+                            Confirm
+                          </button>
                         )}
 
-                        <div className="mt-3 flex flex-wrap gap-2">
-
-                          {!order.dispatched &&
-                            status ===
-                              "pending" && (
-                              <button
-                                onClick={() =>
-                                  manuallyConfirmOrder(
-                                    order
-                                  )
-                                }
-                                disabled={
-                                  confirming
-                                }
-                                className="inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
-                              >
-                                {confirming ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <CheckCircle2 className="h-4 w-4" />
-                                )}
-
-                                Confirm
-                              </button>
-                            )}
-
-                          {!order.dispatched &&
-                            status ===
-                              "confirmed" && (
-                              <button
-                                onClick={() =>
-                                  bookShipment(
-                                    order
-                                  )
-                                }
-                                disabled={
-                                  booking
-                                }
-                                className="inline-flex items-center gap-1.5 rounded-lg bg-orange-500 px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
-                              >
-                                {booking ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Truck className="h-4 w-4" />
-                                )}
-
-                                Book Shipment
-                              </button>
-                            )}
-
-                          {!order.dispatched &&
-                            status !==
-                              "cancelled" && (
-                              <button
-                                onClick={() =>
-                                  cancelOrder(
-                                    order
-                                  )
-                                }
-                                className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-600"
-                              >
-                                <Ban className="h-4 w-4" />
-                                Cancel
-                              </button>
-                            )}
-
+                        {!order.dispatched && status === "confirmed" && (
                           <button
-                            onClick={() =>
-                              setSelectedOrder(
-                                order
-                              )
-                            }
-                            className="rounded-lg border px-3 py-2 text-xs font-semibold text-gray-700"
+                            onClick={() => bookShipment(order)}
+                            disabled={booking}
+                            title="Book courier shipment"
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-orange-500 px-3 py-2 text-xs font-bold text-white hover:bg-orange-600 disabled:opacity-50"
                           >
-                            View
+                            {booking ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Truck className="h-3.5 w-3.5" />
+                            )}
+                            Book
                           </button>
+                        )}
 
+                        {!order.dispatched && status !== "cancelled" && (
                           <button
-                            onClick={() =>
-                              setEditingOrder(
-                                {
-                                  ...order,
-                                }
-                              )
-                            }
-                            className="rounded-lg border p-2 text-gray-600"
+                            onClick={() => cancelOrder(order)}
+                            disabled={cancelling}
+                            title="Cancel order"
+                            className="rounded-lg border border-red-200 p-2 text-red-600 hover:bg-red-50 disabled:opacity-50"
                           >
-                            <Pencil className="h-4 w-4" />
+                            {cancelling ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Ban className="h-3.5 w-3.5" />
+                            )}
                           </button>
+                        )}
 
-                          <button
-                            onClick={() =>
-                              deleteOrder(
-                                order
-                              )
-                            }
-                            className="rounded-lg border border-red-200 p-2 text-red-600"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                        <button
+                          onClick={() => setSelectedOrder(order)}
+                          title="View details"
+                          className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100"
+                        >
+                          View
+                        </button>
 
-                        </div>
+                        <button
+                          onClick={() => setEditingOrder({ ...order })}
+                          title="Edit"
+                          className="rounded-lg border border-gray-200 p-2 text-gray-600 hover:bg-gray-100"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+
+                        <button
+                          onClick={() => deleteOrder(order)}
+                          title="Delete"
+                          className="ml-auto rounded-lg border border-red-200 p-2 text-red-600 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
                       </div>
+                    </div>
+                  </div>
+                )
+              }
+            )}
+          </div>
+        )}
+
+        {/* PAGINATION */}
+
+        {!loading &&
+          filteredOrders.length >
+            0 && (
+            <div className="mt-4 flex flex-col gap-3 rounded-xl border bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+
+              <p className="text-xs text-gray-500">
+                Showing{" "}
+                {(page - 1) *
+                  PAGE_SIZE +
+                  1}
+                –
+                {Math.min(
+                  page *
+                    PAGE_SIZE,
+                  filteredOrders.length
+                )}{" "}
+                of{" "}
+                {
+                  filteredOrders.length
+                }
+              </p>
+
+              <div className="flex items-center gap-2">
+
+                <button
+                  disabled={
+                    page <= 1
+                  }
+                  onClick={() =>
+                    setPage(
+                      (p) =>
+                        Math.max(
+                          1,
+                          p - 1
+                        )
                     )
                   }
-                )}
+                  className="rounded-lg border bg-white px-3 py-2 text-xs disabled:opacity-40"
+                >
+                  Previous
+                </button>
 
-              </div>
-            </>
-          )}
+                <span className="text-xs text-gray-500">
+                  Page {page} of{" "}
+                  {totalPages}
+                </span>
 
-          {/* PAGINATION */}
-
-          {!loading &&
-            filteredOrders.length >
-              0 && (
-              <div className="flex flex-col gap-3 border-t bg-gray-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-
-                <p className="text-xs text-gray-500">
-                  Showing{" "}
-                  {(page - 1) *
-                    PAGE_SIZE +
-                    1}
-                  –
-                  {Math.min(
-                    page *
-                      PAGE_SIZE,
-                    filteredOrders.length
-                  )}{" "}
-                  of{" "}
-                  {
-                    filteredOrders.length
+                <button
+                  disabled={
+                    page >=
+                    totalPages
                   }
-                </p>
+                  onClick={() =>
+                    setPage(
+                      (p) =>
+                        Math.min(
+                          totalPages,
+                          p + 1
+                        )
+                    )
+                  }
+                  className="rounded-lg border bg-white px-3 py-2 text-xs disabled:opacity-40"
+                >
+                  Next
+                </button>
 
-                <div className="flex items-center gap-2">
-
-                  <button
-                    disabled={
-                      page <= 1
-                    }
-                    onClick={() =>
-                      setPage(
-                        (p) =>
-                          Math.max(
-                            1,
-                            p - 1
-                          )
-                      )
-                    }
-                    className="rounded-lg border bg-white px-3 py-2 text-xs disabled:opacity-40"
-                  >
-                    Previous
-                  </button>
-
-                  <span className="text-xs text-gray-500">
-                    Page {page} of{" "}
-                    {totalPages}
-                  </span>
-
-                  <button
-                    disabled={
-                      page >=
-                      totalPages
-                    }
-                    onClick={() =>
-                      setPage(
-                        (p) =>
-                          Math.min(
-                            totalPages,
-                            p + 1
-                          )
-                      )
-                    }
-                    className="rounded-lg border bg-white px-3 py-2 text-xs disabled:opacity-40"
-                  >
-                    Next
-                  </button>
-
-                </div>
               </div>
-            )}
-        </div>
+            </div>
+          )}
       </div>
 
       {/* ORDER DETAILS */}
