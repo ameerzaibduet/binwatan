@@ -2403,7 +2403,7 @@ export default function AdminOrdersPage() {
                 </div>
 
                 <p className="mt-2 text-[11px] text-gray-400">
-                  Editing products here doesn't automatically change the order Total above — update it too if needed.
+                  Editing products here doesn&apos;t automatically change the order Total above — update it too if needed.
                 </p>
               </div>
 
