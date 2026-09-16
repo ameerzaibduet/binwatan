@@ -30,48 +30,16 @@ export async function POST(request: Request) {
       total,
     } = body
 
-    // Validate fields
-    if (!phone) {
+    if (!phone || !customerName || !items || total === undefined || total === null) {
       return NextResponse.json(
         {
           success: false,
-          error: "phone is required",
+          error: "phone, customerName, items and total are required",
         },
         { status: 400 }
       )
     }
 
-    if (!customerName) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "customerName is required",
-        },
-        { status: 400 }
-      )
-    }
-
-    if (!items) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "items is required",
-        },
-        { status: 400 }
-      )
-    }
-
-    if (total === undefined || total === null) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "total is required",
-        },
-        { status: 400 }
-      )
-    }
-
-    // Convert Pakistani number to international format
     let recipient = String(phone).replace(/\D/g, "")
 
     if (recipient.startsWith("0")) {
@@ -91,24 +59,23 @@ export async function POST(request: Request) {
     const url =
       `https://graph.facebook.com/${API_VERSION}/${PHONE_NUMBER_ID}/messages`
 
-    // Template variables:
-    // {{1}} = Customer name
-    // {{2}} = Product details
-    // {{3}} = Total
-
     const payload = {
       messaging_product: "whatsapp",
       recipient_type: "individual",
       to: recipient,
       type: "template",
+
       template: {
         name: TEMPLATE_NAME,
+
         language: {
           code: "en_US",
         },
+
         components: [
           {
             type: "body",
+
             parameters: [
               {
                 type: "text",
@@ -120,7 +87,7 @@ export async function POST(request: Request) {
               },
               {
                 type: "text",
-                text: `Rs ${total}`,
+                text: `Rs. ${total}`,
               },
             ],
           },
@@ -128,17 +95,29 @@ export async function POST(request: Request) {
       },
     }
 
-    console.log("📤 Sending WhatsApp template:", {
-      to: recipient,
-      template: TEMPLATE_NAME,
-    })
+    console.log(
+      "📤 Sending WhatsApp order confirmation:",
+      JSON.stringify(
+        {
+          to: recipient,
+          template: TEMPLATE_NAME,
+          customerName,
+          items,
+          total,
+        },
+        null,
+        2
+      )
+    )
 
     const response = await fetch(url, {
       method: "POST",
+
       headers: {
         Authorization: `Bearer ${ACCESS_TOKEN}`,
         "Content-Type": "application/json",
       },
+
       body: JSON.stringify(payload),
     })
 
@@ -155,12 +134,14 @@ export async function POST(request: Request) {
           success: false,
           error: data,
         },
-        { status: response.status }
+        {
+          status: response.status,
+        }
       )
     }
 
     console.log(
-      "✅ WhatsApp message sent:",
+      "✅ WhatsApp order confirmation sent:",
       JSON.stringify(data, null, 2)
     )
 
