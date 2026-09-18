@@ -1,3 +1,4 @@
+
 import { NextResponse } from "next/server"
 
 export const runtime = "nodejs"
@@ -16,23 +17,35 @@ const TEMPLATE_NAME =
   "order_confirmation"
 
 const TEMPLATE_LANGUAGE =
-  process.env.WHATSAPP_TEMPLATE_LANGUAGE ||
-  "en_US"
+  process.env.WHATSAPP_TEMPLATE_LANGUAGE || "en"
 
 export async function POST(request: Request) {
   try {
     /*
-     * Check environment variables
+     * ==========================================
+     * CHECK ENVIRONMENT VARIABLES
+     * ==========================================
      */
-    if (
-      !PHONE_NUMBER_ID ||
-      !ACCESS_TOKEN
-    ) {
+
+    if (!PHONE_NUMBER_ID) {
       return NextResponse.json(
         {
           success: false,
           error:
-            "WhatsApp environment variables are missing",
+            "WHATSAPP_PHONE_NUMBER_ID is missing",
+        },
+        {
+          status: 500,
+        }
+      )
+    }
+
+    if (!ACCESS_TOKEN) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "WHATSAPP_ACCESS_TOKEN is missing",
         },
         {
           status: 500,
@@ -41,8 +54,11 @@ export async function POST(request: Request) {
     }
 
     /*
-     * Read request body
+     * ==========================================
+     * READ REQUEST BODY
+     * ==========================================
      */
+
     const body = await request.json()
 
     const {
@@ -53,8 +69,11 @@ export async function POST(request: Request) {
     } = body
 
     /*
-     * Validate required fields
+     * ==========================================
+     * VALIDATION
+     * ==========================================
      */
+
     if (!phone) {
       return NextResponse.json(
         {
@@ -71,8 +90,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          error:
-            "customerName is required",
+          error: "customerName is required",
         },
         {
           status: 400,
@@ -80,7 +98,10 @@ export async function POST(request: Request) {
       )
     }
 
-    if (!items) {
+    if (
+      items === undefined ||
+      items === null
+    ) {
       return NextResponse.json(
         {
           success: false,
@@ -108,12 +129,19 @@ export async function POST(request: Request) {
     }
 
     /*
-     * Convert Pakistani phone number
+     * ==========================================
+     * FORMAT PAKISTANI PHONE NUMBER
+     * ==========================================
      *
      * 03172017176
-     *       ↓
+     *      ↓
+     * 923172017176
+     *
+     * 923172017176
+     *      ↓
      * 923172017176
      */
+
     let recipient =
       String(phone).replace(/\D/g, "")
 
@@ -136,18 +164,26 @@ export async function POST(request: Request) {
     }
 
     /*
-     * Meta Graph API endpoint
+     * ==========================================
+     * META GRAPH API URL
+     * ==========================================
      */
+
     const url =
       `https://graph.facebook.com/${API_VERSION}/${PHONE_NUMBER_ID}/messages`
 
     /*
+     * ==========================================
+     * TEMPLATE PAYLOAD
+     * ==========================================
+     *
      * Template:
      *
      * {{1}} = Customer name
      * {{2}} = Product details
      * {{3}} = Total
      */
+
     const payload = {
       messaging_product: "whatsapp",
 
@@ -171,9 +207,7 @@ export async function POST(request: Request) {
             parameters: [
               {
                 type: "text",
-                text: String(
-                  customerName
-                ),
+                text: String(customerName),
               },
 
               {
@@ -191,23 +225,45 @@ export async function POST(request: Request) {
       },
     }
 
+    /*
+     * ==========================================
+     * LOG SEND INFORMATION
+     * ==========================================
+     */
+
     console.log(
-      "📤 Sending Bin Watan WhatsApp template:",
-      JSON.stringify(
-        {
-          to: recipient,
-          template: TEMPLATE_NAME,
-          language:
-            TEMPLATE_LANGUAGE,
-        },
-        null,
-        2
-      )
+      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    )
+
+    console.log(
+      "📤 Sending Bin Watan WhatsApp template"
+    )
+
+    console.log(
+      "To:",
+      recipient
+    )
+
+    console.log(
+      "Template:",
+      TEMPLATE_NAME
+    )
+
+    console.log(
+      "Language:",
+      TEMPLATE_LANGUAGE
+    )
+
+    console.log(
+      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     )
 
     /*
-     * Send to Meta
+     * ==========================================
+     * SEND TO META
+     * ==========================================
      */
+
     const response = await fetch(
       url,
       {
@@ -229,11 +285,17 @@ export async function POST(request: Request) {
       await response.json()
 
     /*
-     * Meta returned an error
+     * ==========================================
+     * META ERROR
+     * ==========================================
      */
+
     if (!response.ok) {
       console.error(
-        "❌ Meta WhatsApp API error:",
+        "❌ Meta WhatsApp API error:"
+      )
+
+      console.error(
         JSON.stringify(
           data,
           null,
@@ -244,20 +306,31 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
+
           error: data,
+
+          template: TEMPLATE_NAME,
+
+          language:
+            TEMPLATE_LANGUAGE,
         },
         {
-          status:
-            response.status,
+          status: response.status,
         }
       )
     }
 
     /*
-     * Successful send
+     * ==========================================
+     * SUCCESS
+     * ==========================================
      */
+
     console.log(
-      "✅ WhatsApp message sent:",
+      "✅ WhatsApp message sent successfully"
+    )
+
+    console.log(
       JSON.stringify(
         data,
         null,
@@ -270,9 +343,23 @@ export async function POST(request: Request) {
 
       data,
 
-      message: "WhatsApp message sent successfully",
+      template: TEMPLATE_NAME,
+
+      language:
+        TEMPLATE_LANGUAGE,
+
+      recipient,
+
+      message:
+        "WhatsApp message sent successfully",
     })
   } catch (error) {
+    /*
+     * ==========================================
+     * UNEXPECTED ERROR
+     * ==========================================
+     */
+
     console.error(
       "❌ WhatsApp send error:",
       error
@@ -281,6 +368,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         success: false,
+
         error:
           error instanceof Error
             ? error.message
