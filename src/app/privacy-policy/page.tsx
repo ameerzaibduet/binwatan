@@ -1,3 +1,4 @@
+
 export default function PrivacyPolicyPage() {
   return (
     <main className="min-h-screen bg-white px-4 py-10 text-gray-800">
@@ -29,8 +30,8 @@ export default function PrivacyPolicyPage() {
             </h2>
             <p>
               When you place an order, we may collect information such as your
-              name, phone number, email address, city, delivery address,
-              order details
+              name, phone number, email address, city, delivery address, and
+              order details.
             </p>
           </section>
 
@@ -56,6 +57,7 @@ export default function PrivacyPolicyPage() {
               including order confirmation, delivery updates, and customer
               support.
             </p>
+
             <p className="mt-3">
               WhatsApp communications are handled through WhatsApp and its
               applicable services and policies.
@@ -73,6 +75,7 @@ export default function PrivacyPolicyPage() {
               website, process orders, communicate with customers, or maintain
               our systems.
             </p>
+
             <p className="mt-3">
               We do not sell your personal information to third parties.
             </p>
@@ -115,7 +118,7 @@ export default function PrivacyPolicyPage() {
 
           <section>
             <h2 className="mb-2 text-xl font-semibold text-black">
-              9. Children's Privacy
+              9. Children&apos;s Privacy
             </h2>
             <p>
               Our website and services are not intended for children under the
