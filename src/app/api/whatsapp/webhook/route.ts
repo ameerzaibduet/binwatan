@@ -1,128 +1,198 @@
-
 import { NextResponse } from "next/server"
 import crypto from "crypto"
+import { createClient } from "@supabase/supabase-js"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
-const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN
-const APP_SECRET = process.env.WHATSAPP_APP_SECRET
+// ============================================================
+// ENVIRONMENT VARIABLES
+// ============================================================
 
-/**
- * Verify Meta webhook signature
- *
- * Meta sends:
- * x-hub-signature-256: sha256=...
- *
- * Signature is calculated using:
- * HMAC-SHA256(raw request body, APP_SECRET)
- */
+const VERIFY_TOKEN =
+  process.env.WHATSAPP_VERIFY_TOKEN
+
+const APP_SECRET =
+  process.env.WHATSAPP_APP_SECRET
+
+const SUPABASE_URL =
+  process.env.NEXT_PUBLIC_SUPABASE_URL
+
+const SUPABASE_SERVICE_ROLE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+
+// ============================================================
+// SUPABASE ADMIN CLIENT
+// ============================================================
+
+const supabaseAdmin =
+  SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
+    ? createClient(
+        SUPABASE_URL,
+        SUPABASE_SERVICE_ROLE_KEY,
+        {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false,
+          },
+        }
+      )
+    : null
+
+// ============================================================
+// META WEBHOOK SIGNATURE VERIFICATION
+// ============================================================
+
 function verifySignature(
   rawBody: string,
   signature: string | null
 ): boolean {
-  if (!APP_SECRET || !signature) {
-    console.error("❌ Missing APP_SECRET or signature")
+  if (!APP_SECRET) {
+    console.error(
+      "❌ WHATSAPP_APP_SECRET is missing"
+    )
+
     return false
   }
 
-  if (!signature.startsWith("sha256=")) {
-    console.error("❌ Invalid signature format")
+  if (!signature) {
+    console.error(
+      "❌ x-hub-signature-256 header missing"
+    )
+
     return false
   }
 
-  const receivedSignature = signature.slice("sha256=".length)
+  if (
+    !signature.startsWith(
+      "sha256="
+    )
+  ) {
+    console.error(
+      "❌ Invalid signature format"
+    )
 
-  const expectedSignature = crypto
-    .createHmac("sha256", APP_SECRET)
-    .update(rawBody)
-    .digest("hex")
+    return false
+  }
+
+  const receivedSignature =
+    signature.substring(
+      "sha256=".length
+    )
+
+  const expectedSignature =
+    crypto
+      .createHmac(
+        "sha256",
+        APP_SECRET
+      )
+      .update(
+        rawBody,
+        "utf8"
+      )
+      .digest("hex")
 
   try {
-    const receivedBuffer = Buffer.from(
-      receivedSignature,
-      "hex"
-    )
-
-    const expectedBuffer = Buffer.from(
-      expectedSignature,
-      "hex"
-    )
-
-    if (
-      receivedBuffer.length !==
-      expectedBuffer.length
-    ) {
-      return false
-    }
-
     return crypto.timingSafeEqual(
-      receivedBuffer,
-      expectedBuffer
+      Buffer.from(
+        receivedSignature,
+        "hex"
+      ),
+      Buffer.from(
+        expectedSignature,
+        "hex"
+      )
     )
-  } catch (error) {
-    console.error(
-      "❌ Signature comparison error:",
-      error
-    )
-
+  } catch {
     return false
   }
 }
 
-/**
- * GET
- *
- * Meta WhatsApp webhook verification
- */
-export async function GET(request: Request) {
+// ============================================================
+// GET
+//
+// Meta uses this when verifying the webhook URL.
+// ============================================================
+
+export async function GET(
+  request: Request
+) {
   try {
-    const { searchParams } = new URL(request.url)
+    const url =
+      new URL(request.url)
 
-    const mode = searchParams.get("hub.mode")
-    const token = searchParams.get(
-      "hub.verify_token"
-    )
-    const challenge = searchParams.get(
-      "hub.challenge"
+    const mode =
+      url.searchParams.get(
+        "hub.mode"
+      )
+
+    const token =
+      url.searchParams.get(
+        "hub.verify_token"
+      )
+
+    const challenge =
+      url.searchParams.get(
+        "hub.challenge"
+      )
+
+    console.log(
+      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     )
 
-    console.log("🔐 Meta webhook verification request")
-    console.log("Mode:", mode)
+    console.log(
+      "🔐 Meta WhatsApp webhook verification"
+    )
+
+    console.log(
+      "Mode:",
+      mode
+    )
+
+    console.log(
+      "Token received:",
+      token
+        ? "YES"
+        : "NO"
+    )
+
+    console.log(
+      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    )
 
     if (
       mode === "subscribe" &&
-      token &&
-      VERIFY_TOKEN &&
-      token === VERIFY_TOKEN &&
-      challenge
+      token === VERIFY_TOKEN
     ) {
       console.log(
-        "✅ Meta WhatsApp webhook verified"
+        "✅ Webhook verification successful"
       )
 
-      return new Response(challenge, {
-        status: 200,
-        headers: {
-          "Content-Type": "text/plain",
-        },
-      })
+      return new NextResponse(
+        challenge || "",
+        {
+          status: 200,
+        }
+      )
     }
 
     console.error(
-      "❌ Meta webhook verification failed"
+      "❌ Webhook verification failed"
     )
 
-    return new Response("Forbidden", {
-      status: 403,
-    })
+    return new NextResponse(
+      "Forbidden",
+      {
+        status: 403,
+      }
+    )
   } catch (error) {
     console.error(
       "❌ Webhook GET error:",
       error
     )
 
-    return new Response(
+    return new NextResponse(
       "Internal Server Error",
       {
         status: 500,
@@ -131,187 +201,211 @@ export async function GET(request: Request) {
   }
 }
 
-/**
- * POST
- *
- * Incoming WhatsApp messages
- * and message status updates.
- */
-export async function POST(request: Request) {
-  try {
-    /**
-     * IMPORTANT:
-     *
-     * Read the raw body BEFORE JSON.parse().
-     *
-     * Meta calculates the webhook signature
-     * using the exact raw request body.
-     */
-    const rawBody = await request.text()
+// ============================================================
+// POST
+//
+// Meta sends incoming WhatsApp messages here.
+// ============================================================
 
-    /**
-     * Meta signature header
-     */
-    const signature = request.headers.get(
-      "x-hub-signature-256"
+export async function POST(
+  request: Request
+) {
+  try {
+    // --------------------------------------------------------
+    // READ RAW BODY
+    //
+    // IMPORTANT:
+    // Signature must be calculated against the raw body.
+    // --------------------------------------------------------
+
+    const rawBody =
+      await request.text()
+
+    const signature =
+      request.headers.get(
+        "x-hub-signature-256"
+      )
+
+    console.log(
+      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     )
 
     console.log(
-      "📨 Meta webhook POST received"
+      "📥 WhatsApp webhook received"
     )
 
-    /**
-     * Verify webhook signature
-     */
-    if (!verifySignature(rawBody, signature)) {
+    console.log(
+      "Signature:",
+      signature
+        ? `${signature.substring(
+            0,
+            20
+          )}...`
+        : "MISSING"
+    )
+
+    console.log(
+      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    )
+
+    // --------------------------------------------------------
+    // VERIFY SIGNATURE
+    // --------------------------------------------------------
+
+    if (
+      !verifySignature(
+        rawBody,
+        signature
+      )
+    ) {
       console.error(
         "❌ Invalid Meta webhook signature"
       )
 
-      return new Response("Forbidden", {
-        status: 403,
-      })
+      return new NextResponse(
+        "Unauthorized",
+        {
+          status: 401,
+        }
+      )
     }
 
     console.log(
       "✅ Meta webhook signature verified"
     )
 
-    /**
-     * Parse JSON
-     */
+    // --------------------------------------------------------
+    // PARSE JSON
+    // --------------------------------------------------------
+
     let body: any
 
     try {
-      body = JSON.parse(rawBody)
-    } catch (error) {
+      body =
+        JSON.parse(
+          rawBody
+        )
+    } catch {
       console.error(
-        "❌ Invalid JSON received:",
-        error
+        "❌ Invalid JSON payload"
       )
 
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Invalid JSON",
-        },
+      return new NextResponse(
+        "Bad Request",
         {
           status: 400,
         }
       )
     }
 
-    /**
-     * Log complete webhook
-     */
-    console.log(
-      "📩 WhatsApp webhook received:"
-    )
+    // --------------------------------------------------------
+    // VERIFY META OBJECT
+    // --------------------------------------------------------
 
-    console.log(
-      JSON.stringify(body, null, 2)
-    )
-
-    /**
-     * Only process WhatsApp Business
-     * Account webhooks.
-     */
     if (
       body?.object !==
       "whatsapp_business_account"
     ) {
       console.log(
-        "ℹ️ Ignoring non-WhatsApp webhook"
+        "ℹ️ Ignoring non-WhatsApp object"
       )
 
-      return NextResponse.json(
-        {
-          success: true,
-        },
-        {
-          status: 200,
-        }
-      )
+      return NextResponse.json({
+        success: true,
+      })
     }
 
-    /**
-     * Get entries
-     */
-    const entries = body?.entry
+    // --------------------------------------------------------
+    // LOOP THROUGH ENTRIES
+    // --------------------------------------------------------
 
-    if (!Array.isArray(entries)) {
-      console.log(
-        "ℹ️ No webhook entries found"
+    const entries =
+      Array.isArray(
+        body?.entry
       )
+        ? body.entry
+        : []
 
-      return NextResponse.json(
-        {
-          success: true,
-        },
-        {
-          status: 200,
-        }
-      )
-    }
+    for (
+      const entry of entries
+    ) {
+      const changes =
+        Array.isArray(
+          entry?.changes
+        )
+          ? entry.changes
+          : []
 
-    /**
-     * Process each entry
-     */
-    for (const entry of entries) {
-      const changes = entry?.changes
-
-      if (!Array.isArray(changes)) {
-        continue
-      }
-
-      /**
-       * Process each change
-       */
-      for (const change of changes) {
-        const value = change?.value
+      for (
+        const change of changes
+      ) {
+        const value =
+          change?.value
 
         if (!value) {
           continue
         }
 
-        /**
-         * ==================================================
-         * WABA INFORMATION
-         * ==================================================
-         */
-
-        const phoneNumberId =
-          value?.metadata?.phone_number_id
-
-        const displayPhoneNumber =
-          value?.metadata?.display_phone_number
-
-        const businessPhoneNumberId =
-          value?.metadata?.display_phone_number
+        // ----------------------------------------------------
+        // METADATA
+        // ----------------------------------------------------
 
         console.log(
-          "📞 Phone Number ID:",
-          phoneNumberId
+          "📱 Display phone:",
+          value?.metadata
+            ?.display_phone_number ||
+            "unknown"
         )
 
         console.log(
-          "📞 Display Number:",
-          displayPhoneNumber
+          "📱 Phone number ID:",
+          value?.metadata
+            ?.phone_number_id ||
+            "unknown"
         )
 
-        /**
-         * ==================================================
-         * INCOMING MESSAGES
-         * ==================================================
-         */
+        // ----------------------------------------------------
+        // MESSAGES
+        // ----------------------------------------------------
 
-        const messages = value?.messages
+        const messages =
+          Array.isArray(
+            value?.messages
+          )
+            ? value.messages
+            : []
 
-        if (Array.isArray(messages)) {
-          for (const message of messages) {
-            const from = message?.from
-            const messageId = message?.id
-            const messageType = message?.type
+        if (
+          messages.length === 0
+        ) {
+          console.log(
+            "ℹ️ No incoming messages in this event"
+          )
+
+          continue
+        }
+
+        // ----------------------------------------------------
+        // PROCESS EACH MESSAGE
+        // ----------------------------------------------------
+
+        for (
+          const message of messages
+        ) {
+          try {
+            // =================================================
+            // BASIC MESSAGE DATA
+            // =================================================
+
+            const from =
+              message?.from
+
+            const messageId =
+              message?.id
+
+            const messageType =
+              message?.type
+
             const timestamp =
               message?.timestamp
 
@@ -320,7 +414,7 @@ export async function POST(request: Request) {
             )
 
             console.log(
-              "📱 Incoming WhatsApp message"
+              "📩 Incoming WhatsApp message"
             )
 
             console.log(
@@ -343,36 +437,80 @@ export async function POST(request: Request) {
               timestamp
             )
 
-            /**
-             * ==================================================
-             * TEXT MESSAGE
-             * ==================================================
-             */
+            console.log(
+              "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            )
 
-            if (messageType === "text") {
+            // =================================================
+            // IGNORE MISSING SENDER
+            // =================================================
+
+            if (!from) {
+              console.log(
+                "⚠️ Message has no sender"
+              )
+
+              continue
+            }
+
+            // =================================================
+            // IGNORE GROUP MESSAGES
+            // =================================================
+
+            if (
+              String(from).includes(
+                "@g.us"
+              )
+            ) {
+              console.log(
+                "ℹ️ Group message ignored"
+              )
+
+              continue
+            }
+
+            // =================================================
+            // FROM-ME CHECK
+            //
+            // Normally incoming messages have fromMe=false.
+            // Keep this check if Meta supplies it.
+            // =================================================
+
+            const fromMe =
+              message?.fromMe
+
+            if (
+              fromMe === true
+            ) {
+              console.log(
+                "ℹ️ Outgoing message ignored"
+              )
+
+              continue
+            }
+
+            // =================================================
+            // TEXT MESSAGE
+            // =================================================
+
+            if (
+              messageType ===
+              "text"
+            ) {
               const text =
-                message?.text?.body ?? ""
+                message?.text?.body
 
               console.log(
                 "💬 Customer text:",
-                text
+                text || ""
               )
 
-              /**
-               * Later we can process:
-               *
-               * - Customer replies
-               * - Order lookup
-               * - Help requests
-               * - Address confirmation
-               */
+              continue
             }
 
-            /**
-             * ==================================================
-             * INTERACTIVE MESSAGE
-             * ==================================================
-             */
+            // =================================================
+            // INTERACTIVE MESSAGE
+            // =================================================
 
             if (
               messageType ===
@@ -381,31 +519,20 @@ export async function POST(request: Request) {
               const interactive =
                 message?.interactive
 
+              const interactiveType =
+                interactive?.type
+
               console.log(
                 "🔘 Interactive type:",
-                interactive?.type
+                interactiveType
               )
 
-              /**
-               * ==================================================
-               * BUTTON REPLY
-               * ==================================================
-               *
-               * Current template has:
-               *
-               * Confirm
-               * Cancel
-               *
-               * IMPORTANT:
-               *
-               * We log the actual button ID that Meta sends.
-               *
-               * Do NOT assume that the visible Urdu/English
-               * title is the same thing as the button ID.
-               */
+              // =================================================
+              // BUTTON REPLY
+              // =================================================
 
               if (
-                interactive?.type ===
+                interactiveType ===
                 "button_reply"
               ) {
                 const buttonId =
@@ -418,231 +545,374 @@ export async function POST(request: Request) {
                     ?.button_reply
                     ?.title
 
+                // IMPORTANT:
+                //
+                // This is the WhatsApp message ID
+                // of the template the customer replied to.
+                //
+                // We saved this ID in:
+                //
+                // orders.whatsapp_message_id
+                //
+                const repliedToMessageId =
+                  message
+                    ?.context
+                    ?.id
+
                 console.log(
-                  "🔘 Button ID:",
+                  "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                )
+
+                console.log(
+                  "🔘 BUTTON REPLY"
+                )
+
+                console.log(
+                  "Button ID:",
                   buttonId
                 )
 
                 console.log(
-                  "🔘 Button title:",
+                  "Button title:",
                   buttonTitle
                 )
 
-                /**
-                 * IMPORTANT:
-                 *
-                 * These IDs are placeholders until
-                 * we receive the real Meta webhook.
-                 *
-                 * After clicking the actual buttons,
-                 * check the server logs.
-                 */
+                console.log(
+                  "Replied-to WhatsApp Message ID:",
+                  repliedToMessageId
+                )
 
-                switch (buttonId) {
+                console.log(
+                  "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                )
+
+                // ------------------------------------------------
+                // CHECK MESSAGE ID
+                // ------------------------------------------------
+
+                if (
+                  !repliedToMessageId
+                ) {
+                  console.error(
+                    "❌ No context.id found in button reply"
+                  )
+
+                  continue
+                }
+
+                // ------------------------------------------------
+                // CHECK BUTTON ID
+                //
+                // IMPORTANT:
+                // We use actual Meta button IDs here.
+                //
+                // If your real webhook gives different IDs,
+                // replace these AFTER testing.
+                // ------------------------------------------------
+
+                let newStatus:
+                  | "confirmed"
+                  | "cancelled"
+                  | null =
+                  null
+
+                switch (
+                  buttonId
+                ) {
                   case "confirm_order":
+                    newStatus =
+                      "confirmed"
+
                     console.log(
                       "✅ Customer confirmed order"
                     )
 
-                    /**
-                     * Later:
-                     *
-                     * Update Supabase:
-                     *
-                     * order_status = "confirmed"
-                     *
-                     * We first need to associate
-                     * the WhatsApp number with
-                     * the correct order.
-                     */
-
                     break
 
                   case "cancel_order":
+                    newStatus =
+                      "cancelled"
+
                     console.log(
                       "❌ Customer cancelled order"
                     )
-
-                    /**
-                     * Later:
-                     *
-                     * Update Supabase:
-                     *
-                     * order_status = "cancelled"
-                     *
-                     * We first need to associate
-                     * the WhatsApp number with
-                     * the correct order.
-                     */
 
                     break
 
                   default:
                     console.log(
-                      "ℹ️ Unknown button:",
+                      "ℹ️ Unknown button ID:",
                       buttonId
                     )
+
+                    continue
                 }
+
+                // ------------------------------------------------
+                // CHECK SUPABASE
+                // ------------------------------------------------
+
+                if (
+                  !supabaseAdmin
+                ) {
+                  console.error(
+                    "❌ Supabase admin client is not available"
+                  )
+
+                  continue
+                }
+
+                // ------------------------------------------------
+                // FIND EXACT ORDER
+                //
+                // This is the important part.
+                //
+                // We DON'T search only by phone number.
+                //
+                // We search by the exact WhatsApp message
+                // that the customer replied to.
+                // ------------------------------------------------
+
+                const {
+                  data: order,
+                  error:
+                    findOrderError,
+                } =
+                  await supabaseAdmin
+                    .from(
+                      "orders"
+                    )
+                    .select(
+                      `
+                      id,
+                      name,
+                      phone,
+                      total,
+                      order_status,
+                      whatsapp_message_id
+                      `
+                    )
+                    .eq(
+                      "whatsapp_message_id",
+                      repliedToMessageId
+                    )
+                    .maybeSingle()
+
+                // ------------------------------------------------
+                // DATABASE LOOKUP ERROR
+                // ------------------------------------------------
+
+                if (
+                  findOrderError
+                ) {
+                  console.error(
+                    "❌ Error finding order:"
+                  )
+
+                  console.error(
+                    findOrderError
+                  )
+
+                  continue
+                }
+
+                // ------------------------------------------------
+                // ORDER NOT FOUND
+                // ------------------------------------------------
+
+                if (!order) {
+                  console.error(
+                    "❌ No order found for WhatsApp message ID:",
+                    repliedToMessageId
+                  )
+
+                  continue
+                }
+
+                console.log(
+                  "📦 Matching order found:"
+                )
+
+                console.log(
+                  "Order ID:",
+                  order.id
+                )
+
+                console.log(
+                  "Customer:",
+                  order.name
+                )
+
+                console.log(
+                  "Phone:",
+                  order.phone
+                )
+
+                console.log(
+                  "Current status:",
+                  order.order_status
+                )
+
+                // ------------------------------------------------
+                // PREVENT UNNECESSARY DUPLICATE UPDATE
+                // ------------------------------------------------
+
+                if (
+                  order.order_status ===
+                  newStatus
+                ) {
+                  console.log(
+                    `ℹ️ Order ${order.id} is already ${newStatus}`
+                  )
+
+                  continue
+                }
+
+                // ------------------------------------------------
+                // UPDATE ORDER
+                // ------------------------------------------------
+
+                const {
+                  error:
+                    updateError,
+                } =
+                  await supabaseAdmin
+                    .from(
+                      "orders"
+                    )
+                    .update({
+                      order_status:
+                        newStatus,
+                    })
+                    .eq(
+                      "id",
+                      order.id
+                    )
+
+                // ------------------------------------------------
+                // UPDATE ERROR
+                // ------------------------------------------------
+
+                if (
+                  updateError
+                ) {
+                  console.error(
+                    "❌ Failed to update order:"
+                  )
+
+                  console.error(
+                    updateError
+                  )
+
+                  continue
+                }
+
+                // ------------------------------------------------
+                // SUCCESS
+                // ------------------------------------------------
+
+                console.log(
+                  "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                )
+
+                console.log(
+                  "✅ ORDER UPDATED SUCCESSFULLY"
+                )
+
+                console.log(
+                  "Order ID:",
+                  order.id
+                )
+
+                console.log(
+                  "New status:",
+                  newStatus
+                )
+
+                console.log(
+                  "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                )
               }
 
-              /**
-               * ==================================================
-               * LIST REPLY
-               * ==================================================
-               *
-               * Kept for future use.
-               */
+              // =================================================
+              // OTHER INTERACTIVE TYPES
+              // =================================================
 
-              if (
-                interactive?.type ===
-                "list_reply"
-              ) {
-                const listReply =
-                  interactive?.list_reply
-
+              else {
                 console.log(
-                  "📋 List reply ID:",
-                  listReply?.id
-                )
-
-                console.log(
-                  "📋 List reply title:",
-                  listReply?.title
-                )
-
-                console.log(
-                  "📋 List reply description:",
-                  listReply?.description
+                  "ℹ️ Interactive message type:",
+                  interactiveType
                 )
               }
+
+              continue
             }
 
-            console.log(
-              "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            )
-          }
-        }
+            // =================================================
+            // BUTTON TYPE
+            //
+            // Some payloads/providers may expose a direct
+            // button structure.
+            // =================================================
 
-        /**
-         * ==================================================
-         * MESSAGE STATUS UPDATES
-         * ==================================================
-         */
-
-        const statuses = value?.statuses
-
-        if (Array.isArray(statuses)) {
-          for (const status of statuses) {
-            const messageId = status?.id
-
-            const statusValue =
-              status?.status
-
-            const recipientId =
-              status?.recipient_id
-
-            const timestamp =
-              status?.timestamp
-
-            console.log(
-              "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            )
-
-            console.log(
-              "📊 WhatsApp message status"
-            )
-
-            console.log(
-              "Message ID:",
-              messageId
-            )
-
-            console.log(
-              "Status:",
-              statusValue
-            )
-
-            console.log(
-              "Recipient:",
-              recipientId
-            )
-
-            console.log(
-              "Timestamp:",
-              timestamp
-            )
-
-            /**
-             * SENT
-             */
             if (
-              statusValue === "sent"
+              messageType ===
+              "button"
             ) {
               console.log(
-                "📤 Message sent"
+                "🔘 Direct button message:"
               )
-            }
 
-            /**
-             * DELIVERED
-             */
-            if (
-              statusValue ===
-              "delivered"
-            ) {
               console.log(
-                "📬 Message delivered"
-              )
-            }
-
-            /**
-             * READ
-             */
-            if (
-              statusValue === "read"
-            ) {
-              console.log(
-                "👀 Message read"
-              )
-            }
-
-            /**
-             * FAILED
-             */
-            if (
-              statusValue === "failed"
-            ) {
-              console.error(
-                "❌ WhatsApp message failed:"
-              )
-
-              console.error(
                 JSON.stringify(
-                  status,
+                  message,
                   null,
                   2
                 )
               )
+
+              continue
             }
 
+            // =================================================
+            // OTHER MESSAGE TYPES
+            // =================================================
+
             console.log(
-              "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              "ℹ️ Unsupported message type:",
+              messageType
             )
+
+            console.log(
+              JSON.stringify(
+                message,
+                null,
+                2
+              )
+            )
+          } catch (
+            messageError
+          ) {
+            console.error(
+              "❌ Error processing individual message:",
+              messageError
+            )
+
+            // Continue processing other messages.
+            continue
           }
         }
       }
     }
 
-    /**
-     * ==================================================
-     * ACKNOWLEDGE WEBHOOK
-     * ==================================================
-     *
-     * Meta expects a successful response.
-     */
+    // ========================================================
+    // ALWAYS RETURN 200 AFTER VALID META WEBHOOK
+    // ========================================================
+
     return NextResponse.json(
       {
         success: true,
+        received: true,
       },
       {
         status: 200,
@@ -654,18 +924,17 @@ export async function POST(request: Request) {
       error
     )
 
-    /**
-     * Return 200 so Meta does not repeatedly
-     * retry an event that has already reached us.
-     */
     return NextResponse.json(
       {
-        success: true,
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Unknown error",
       },
       {
-        status: 200,
+        status: 500,
       }
     )
   }
 }
-

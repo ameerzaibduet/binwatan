@@ -1,8 +1,12 @@
-
 import { NextResponse } from "next/server"
+import { createClient } from "@supabase/supabase-js"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
+
+// ============================================================
+// ENVIRONMENT VARIABLES
+// ============================================================
 
 const PHONE_NUMBER_ID =
   process.env.WHATSAPP_PHONE_NUMBER_ID
@@ -19,13 +23,50 @@ const TEMPLATE_NAME =
 const TEMPLATE_LANGUAGE =
   process.env.WHATSAPP_TEMPLATE_LANGUAGE || "en"
 
+const SUPABASE_URL =
+  process.env.NEXT_PUBLIC_SUPABASE_URL
+
+const SUPABASE_SERVICE_ROLE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+
+// ============================================================
+// SUPABASE SERVER CLIENT
+// ============================================================
+
+const supabaseAdmin =
+  SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
+    ? createClient(
+        SUPABASE_URL,
+        SUPABASE_SERVICE_ROLE_KEY,
+        {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false,
+          },
+        }
+      )
+    : null
+
+// ============================================================
+// TYPES
+// ============================================================
+
+type WhatsAppItem = {
+  name: string
+  quantity: number
+  color?: string | null
+  size?: string | null
+}
+
+// ============================================================
+// POST
+// ============================================================
+
 export async function POST(request: Request) {
   try {
-    /*
-     * ==========================================
-     * CHECK ENVIRONMENT VARIABLES
-     * ==========================================
-     */
+    // --------------------------------------------------------
+    // CHECK ENVIRONMENT
+    // --------------------------------------------------------
 
     if (!PHONE_NUMBER_ID) {
       return NextResponse.json(
@@ -34,9 +75,7 @@ export async function POST(request: Request) {
           error:
             "WHATSAPP_PHONE_NUMBER_ID is missing",
         },
-        {
-          status: 500,
-        }
+        { status: 500 }
       )
     }
 
@@ -47,17 +86,46 @@ export async function POST(request: Request) {
           error:
             "WHATSAPP_ACCESS_TOKEN is missing",
         },
-        {
-          status: 500,
-        }
+        { status: 500 }
       )
     }
 
-    /*
-     * ==========================================
-     * READ REQUEST BODY
-     * ==========================================
-     */
+    if (!SUPABASE_URL) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "NEXT_PUBLIC_SUPABASE_URL is missing",
+        },
+        { status: 500 }
+      )
+    }
+
+    if (!SUPABASE_SERVICE_ROLE_KEY) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "SUPABASE_SERVICE_ROLE_KEY is missing",
+        },
+        { status: 500 }
+      )
+    }
+
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Supabase server client could not be created",
+        },
+        { status: 500 }
+      )
+    }
+
+    // --------------------------------------------------------
+    // READ REQUEST
+    // --------------------------------------------------------
 
     const body = await request.json()
 
@@ -66,13 +134,12 @@ export async function POST(request: Request) {
       customerName,
       items,
       total,
+      orderId,
     } = body
 
-    /*
-     * ==========================================
-     * VALIDATION
-     * ==========================================
-     */
+    // --------------------------------------------------------
+    // VALIDATION
+    // --------------------------------------------------------
 
     if (!phone) {
       return NextResponse.json(
@@ -80,9 +147,7 @@ export async function POST(request: Request) {
           success: false,
           error: "phone is required",
         },
-        {
-          status: 400,
-        }
+        { status: 400 }
       )
     }
 
@@ -92,9 +157,7 @@ export async function POST(request: Request) {
           success: false,
           error: "customerName is required",
         },
-        {
-          status: 400,
-        }
+        { status: 400 }
       )
     }
 
@@ -107,9 +170,7 @@ export async function POST(request: Request) {
           success: false,
           error: "items is required",
         },
-        {
-          status: 400,
-        }
+        { status: 400 }
       )
     }
 
@@ -122,28 +183,28 @@ export async function POST(request: Request) {
           success: false,
           error: "total is required",
         },
-        {
-          status: 400,
-        }
+        { status: 400 }
       )
     }
 
-    /*
-     * ==========================================
-     * FORMAT PAKISTANI PHONE NUMBER
-     * ==========================================
-     *
-     * 03172017176
-     *      ↓
-     * 923172017176
-     *
-     * 923172017176
-     *      ↓
-     * 923172017176
-     */
+    if (!orderId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "orderId is required",
+        },
+        { status: 400 }
+      )
+    }
 
-    let recipient =
-      String(phone).replace(/\D/g, "")
+    // --------------------------------------------------------
+    // NORMALIZE PHONE NUMBER
+    // --------------------------------------------------------
+
+    let recipient = String(phone).replace(
+      /\D/g,
+      ""
+    )
 
     if (recipient.startsWith("0")) {
       recipient =
@@ -157,36 +218,103 @@ export async function POST(request: Request) {
           error:
             "Phone number must be a Pakistani number",
         },
-        {
-          status: 400,
-        }
+        { status: 400 }
       )
     }
 
-    /*
-     * ==========================================
-     * META GRAPH API URL
-     * ==========================================
-     */
+    // --------------------------------------------------------
+    // VERIFY ORDER EXISTS
+    // --------------------------------------------------------
+
+    const {
+      data: existingOrder,
+      error: orderLookupError,
+    } = await supabaseAdmin
+      .from("orders")
+      .select(
+        "id, name, phone, total, order_status"
+      )
+      .eq("id", orderId)
+      .maybeSingle()
+
+    if (orderLookupError) {
+      console.error(
+        "❌ Supabase order lookup error:",
+        orderLookupError
+      )
+
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Could not verify order",
+          details: orderLookupError.message,
+        },
+        { status: 500 }
+      )
+    }
+
+    if (!existingOrder) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Order not found",
+          orderId,
+        },
+        { status: 404 }
+      )
+    }
+
+    // --------------------------------------------------------
+    // PREPARE ITEMS
+    // --------------------------------------------------------
+
+    let itemText = String(items)
+
+    if (Array.isArray(items)) {
+      itemText = (items as WhatsAppItem[])
+        .map((item) => {
+          let line =
+            `${item.name} x${item.quantity}`
+
+          if (item.color) {
+            line += ` - ${item.color}`
+          }
+
+          if (item.size) {
+            line += ` - ${item.size}`
+          }
+
+          return line
+        })
+        .join("\n")
+    }
+
+    // --------------------------------------------------------
+    // META WHATSAPP API URL
+    // --------------------------------------------------------
 
     const url =
-      `https://graph.facebook.com/${API_VERSION}/${PHONE_NUMBER_ID}/messages`
+      `https://graph.facebook.com/` +
+      `${API_VERSION}/` +
+      `${PHONE_NUMBER_ID}/messages`
 
-    /*
-     * ==========================================
-     * TEMPLATE PAYLOAD
-     * ==========================================
-     *
-     * Template:
-     *
-     * {{1}} = Customer name
-     * {{2}} = Product details
-     * {{3}} = Total
-     */
+    // --------------------------------------------------------
+    // WHATSAPP TEMPLATE
+    //
+    // Template:
+    // order_confirmation
+    //
+    // Body parameters:
+    // {{1}} = Customer name
+    // {{2}} = Product details
+    // {{3}} = Total
+    //
+    // Buttons are already configured in Meta.
+    // --------------------------------------------------------
 
     const payload = {
       messaging_product: "whatsapp",
-
       recipient_type: "individual",
 
       to: recipient,
@@ -207,12 +335,14 @@ export async function POST(request: Request) {
             parameters: [
               {
                 type: "text",
-                text: String(customerName),
+                text: String(
+                  customerName
+                ),
               },
 
               {
                 type: "text",
-                text: String(items),
+                text: itemText,
               },
 
               {
@@ -225,11 +355,9 @@ export async function POST(request: Request) {
       },
     }
 
-    /*
-     * ==========================================
-     * LOG SEND INFORMATION
-     * ==========================================
-     */
+    // --------------------------------------------------------
+    // LOG
+    // --------------------------------------------------------
 
     console.log(
       "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -237,6 +365,11 @@ export async function POST(request: Request) {
 
     console.log(
       "📤 Sending Bin Watan WhatsApp template"
+    )
+
+    console.log(
+      "Order ID:",
+      orderId
     )
 
     console.log(
@@ -258,11 +391,9 @@ export async function POST(request: Request) {
       "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     )
 
-    /*
-     * ==========================================
-     * SEND TO META
-     * ==========================================
-     */
+    // --------------------------------------------------------
+    // SEND TO META
+    // --------------------------------------------------------
 
     const response = await fetch(
       url,
@@ -277,18 +408,18 @@ export async function POST(request: Request) {
             "application/json",
         },
 
-        body: JSON.stringify(payload),
+        body: JSON.stringify(
+          payload
+        ),
       }
     )
 
     const data =
       await response.json()
 
-    /*
-     * ==========================================
-     * META ERROR
-     * ==========================================
-     */
+    // --------------------------------------------------------
+    // META ERROR
+    // --------------------------------------------------------
 
     if (!response.ok) {
       console.error(
@@ -306,25 +437,23 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-
           error: data,
-
-          template: TEMPLATE_NAME,
-
+          orderId,
+          template:
+            TEMPLATE_NAME,
           language:
             TEMPLATE_LANGUAGE,
         },
         {
-          status: response.status,
+          status:
+            response.status,
         }
       )
     }
 
-    /*
-     * ==========================================
-     * SUCCESS
-     * ==========================================
-     */
+    // --------------------------------------------------------
+    // META SUCCESS
+    // --------------------------------------------------------
 
     console.log(
       "✅ WhatsApp message sent successfully"
@@ -338,28 +467,101 @@ export async function POST(request: Request) {
       )
     )
 
+    // --------------------------------------------------------
+    // GET WHATSAPP MESSAGE ID
+    // --------------------------------------------------------
+
+    const whatsappMessageId =
+      data?.messages?.[0]?.id
+
+    if (!whatsappMessageId) {
+      console.error(
+        "⚠️ Meta response did not contain message ID"
+      )
+
+      return NextResponse.json(
+        {
+          success: true,
+          warning:
+            "Message sent but WhatsApp message ID was not returned",
+          data,
+          orderId,
+        }
+      )
+    }
+
+    console.log(
+      "🆔 WhatsApp Message ID:",
+      whatsappMessageId
+    )
+
+    // --------------------------------------------------------
+    // SAVE WHATSAPP MESSAGE ID TO SUPABASE
+    // --------------------------------------------------------
+
+    const {
+      error: saveMessageIdError,
+    } = await supabaseAdmin
+      .from("orders")
+      .update({
+        whatsapp_message_id:
+          whatsappMessageId,
+      })
+      .eq("id", orderId)
+
+    if (saveMessageIdError) {
+      console.error(
+        "❌ Failed to save WhatsApp message ID:"
+      )
+
+      console.error(
+        saveMessageIdError
+      )
+
+      // Message was already sent.
+      // Don't report the whole WhatsApp send as failed.
+      return NextResponse.json(
+        {
+          success: true,
+          warning:
+            "WhatsApp sent, but message ID could not be saved",
+          data,
+          orderId,
+          whatsappMessageId,
+        }
+      )
+    }
+
+    console.log(
+      "✅ WhatsApp message ID saved to order:",
+      orderId
+    )
+
+    // --------------------------------------------------------
+    // FINAL RESPONSE
+    // --------------------------------------------------------
+
     return NextResponse.json({
       success: true,
 
-      data,
+      orderId,
 
-      template: TEMPLATE_NAME,
+      recipient,
+
+      template:
+        TEMPLATE_NAME,
 
       language:
         TEMPLATE_LANGUAGE,
 
-      recipient,
+      whatsappMessageId,
+
+      data,
 
       message:
-        "WhatsApp message sent successfully",
+        "WhatsApp order confirmation sent and message ID saved successfully",
     })
   } catch (error) {
-    /*
-     * ==========================================
-     * UNEXPECTED ERROR
-     * ==========================================
-     */
-
     console.error(
       "❌ WhatsApp send error:",
       error
@@ -368,15 +570,12 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         success: false,
-
         error:
           error instanceof Error
             ? error.message
             : "Unknown error",
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     )
   }
 }

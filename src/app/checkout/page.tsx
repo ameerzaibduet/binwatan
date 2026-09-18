@@ -31,19 +31,24 @@ import {
   trackTikTokEvent,
 } from "@/lib/tiktok"
 
+type WhatsAppItem = {
+  name: string
+  quantity: number
+  color?: string | null
+  size?: string | null
+}
+
 export default function CheckoutPage() {
   const { cart, clearCart } = useCart()
   const { addOrder, setPhone } = useCustomerOrders()
   const router = useRouter()
 
   const [hydrated, setHydrated] = useState(false)
-
   const [name, setName] = useState("")
   const [number, setNumber] = useState("")
   const [email, setEmail] = useState("")
   const [city, setCity] = useState("")
   const [address, setAddress] = useState("")
-
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState("")
   const [cityOpen, setCityOpen] = useState(false)
@@ -61,7 +66,9 @@ export default function CheckoutPage() {
 
   const [locationLoading, setLocationLoading] = useState(false)
 
-  useEffect(() => setHydrated(true), [])
+  useEffect(() => {
+    setHydrated(true)
+  }, [])
 
   if (!hydrated) {
     return (
@@ -71,7 +78,11 @@ export default function CheckoutPage() {
     )
   }
 
-  const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  const total = cart.reduce(
+    (sum, item) => sum + item.price * item.quantity,
+    0
+  )
+
   const hasTopCover = cartContainsTopCover(cart)
   const hasRainSuit = cartContainsRainSuit(cart)
   const showBikeOptions = !hasTopCover && !hasRainSuit
@@ -90,6 +101,7 @@ export default function CheckoutPage() {
           latitude: pos.coords.latitude,
           longitude: pos.coords.longitude,
         })
+
         setLocationLoading(false)
       },
       () => {
@@ -108,12 +120,14 @@ export default function CheckoutPage() {
     }
 
     const phoneRegex = /^(?:\+92|92|0)3\d{9}$/
+
     if (!phoneRegex.test(number)) {
       setErrorMsg("Invalid phone number")
       return
     }
 
-    const selectedBikes = []
+    const selectedBikes: string[] = []
+
     if (showBikeOptions) {
       if (bike70) selectedBikes.push("70cc")
       if (bike100) selectedBikes.push("100cc")
@@ -124,70 +138,194 @@ export default function CheckoutPage() {
 
     setLoading(true)
 
-    const order = {
-      name,
-      phone: number,
-      email: email || null,
-      city,
-      address,
-      bike_specifications: selectedBikes.join(", "),
-      latitude: location?.latitude || null,
-      longitude: location?.longitude || null,
-      items: cart.map((item) => ({
-        id: item.id,
-        name: item.name,
-        price: item.price,
-        quantity: item.quantity,
-        color: item.color ?? null,
-        size: item.size ?? null,
-        image: item.image,
-      })),
-      total,
-      dispatched: false,
-      order_status: "pending",
-    }
+    try {
+      // ============================================
+      // 1. CREATE ORDER IN SUPABASE
+      // ============================================
 
-    const { data, error } = await supabase.from("orders").insert([order]).select().single()
+      const order = {
+        name,
+        phone: number,
+        email: email || null,
+        city,
+        address,
 
-    if (error || !data) {
-      setErrorMsg("Order failed. Try again.")
+        bike_specifications: selectedBikes.join(", "),
+
+        latitude: location?.latitude || null,
+        longitude: location?.longitude || null,
+
+        items: cart.map((item) => ({
+          id: item.id,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+          color: item.color ?? null,
+          size: item.size ?? null,
+          image: item.image,
+        })),
+
+        total,
+
+        dispatched: false,
+
+        // IMPORTANT:
+        // New orders start as pending.
+        order_status: "pending",
+      }
+
+      const { data, error } = await supabase
+        .from("orders")
+        .insert([order])
+        .select()
+        .single()
+
+      if (error || !data) {
+        console.error("Order creation error:", error)
+
+        setErrorMsg("Order failed. Try again.")
+        setLoading(false)
+        return
+      }
+
+      console.log("✅ Order created:", data.id)
+
+      // ============================================
+      // 2. PREPARE CUSTOMER ORDER FOR LOCAL STORAGE
+      // ============================================
+
+      const savedOrder = {
+        id: data.id,
+        name: data.name,
+        phone: data.phone,
+        city: data.city,
+        address: data.address,
+        total: data.total,
+        items: data.items,
+        bike_specifications: data.bike_specifications,
+        created_at: data.created_at,
+        dispatched: data.dispatched,
+        transaction_status: data.transaction_status ?? null,
+        delivery_date: data.delivery_date ?? null,
+        tracking_number: data.tracking_number ?? null,
+      }
+
+      addOrder(savedOrder)
+      setPhone(data.phone)
+
+      sessionStorage.setItem(
+        "lastPlacedOrder",
+        JSON.stringify(savedOrder)
+      )
+
+      // ============================================
+      // 3. SEND WHATSAPP ORDER CONFIRMATION
+      // ============================================
+
+      try {
+        const whatsappItems = (data.items as WhatsAppItem[])
+          .map((item) => {
+            let line = `${item.name} x${item.quantity}`
+
+            if (item.color) {
+              line += ` - ${item.color}`
+            }
+
+            if (item.size) {
+              line += ` - ${item.size}`
+            }
+
+            return line
+          })
+          .join("\n")
+
+        console.log("📤 Sending WhatsApp confirmation...")
+
+        const whatsappResponse = await fetch(
+          "/api/whatsapp/send",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+
+            body: JSON.stringify({
+              phone: data.phone,
+              customerName: data.name,
+              items: whatsappItems,
+              total: data.total,
+
+              // VERY IMPORTANT
+              // Send the Supabase order ID to our API.
+              orderId: data.id,
+            }),
+          }
+        )
+
+        const whatsappResult = await whatsappResponse.json()
+
+        if (!whatsappResponse.ok) {
+          console.error(
+            "❌ WhatsApp confirmation failed:",
+            whatsappResult
+          )
+        } else {
+          console.log(
+            "✅ WhatsApp confirmation sent:",
+            whatsappResult
+          )
+        }
+      } catch (whatsappError) {
+        // WhatsApp failure must NOT cancel the order.
+        console.error(
+          "❌ WhatsApp request failed:",
+          whatsappError
+        )
+      }
+
+      // ============================================
+      // 4. TIKTOK TRACKING
+      // ============================================
+
+      await identifyTikTokCustomer({
+        email,
+        phone: number,
+      })
+
+      trackTikTokEvent(
+        "Purchase",
+        buildTikTokCartParams(cart)
+      )
+
+      // ============================================
+      // 5. CLEAR CART
+      // ============================================
+
+      clearCart()
+
+      // ============================================
+      // 6. GO TO SUCCESS PAGE
+      // ============================================
+
+      router.push("/order-success")
+    } catch (error) {
+      console.error("❌ Checkout error:", error)
+
+      setErrorMsg("Something went wrong. Please try again.")
       setLoading(false)
-      return
     }
-
-    const savedOrder = {
-      id: data.id,
-      name: data.name,
-      phone: data.phone,
-      city: data.city,
-      address: data.address,
-      total: data.total,
-      items: data.items,
-      bike_specifications: data.bike_specifications,
-      created_at: data.created_at,
-      dispatched: data.dispatched,
-      transaction_status: data.transaction_status ?? null,
-      delivery_date: data.delivery_date ?? null,
-      tracking_number: data.tracking_number ?? null,
-    }
-
-    addOrder(savedOrder)
-    setPhone(data.phone)
-    sessionStorage.setItem("lastPlacedOrder", JSON.stringify(savedOrder))
-
-    await identifyTikTokCustomer({ email, phone: number })
-    trackTikTokEvent("Purchase", buildTikTokCartParams(cart))
-    clearCart()
-    router.push("/order-success")
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#fafaf9] to-white">
       <div className="mx-auto grid max-w-5xl gap-8 px-4 py-8 lg:grid-cols-[1fr_360px] lg:px-6 lg:py-12">
+
+        {/* LEFT */}
         <div>
           <h1 className="text-3xl font-black uppercase tracking-tight text-slate-900">
             Checkout
           </h1>
+
           <p className="mt-2 text-sm text-slate-500">
             Complete your details to place the order
           </p>
@@ -199,6 +337,7 @@ export default function CheckoutPage() {
           )}
 
           <div className="mt-6 space-y-4 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+
             <Input
               placeholder="Full name"
               value={name}
@@ -229,10 +368,17 @@ export default function CheckoutPage() {
               className="h-12 rounded-xl"
             />
 
-            <Popover open={cityOpen} onOpenChange={setCityOpen}>
+            <Popover
+              open={cityOpen}
+              onOpenChange={setCityOpen}
+            >
               <PopoverTrigger asChild>
-                <Button variant="outline" className="h-12 w-full justify-between rounded-xl">
+                <Button
+                  variant="outline"
+                  className="h-12 w-full justify-between rounded-xl"
+                >
                   {city || "Select city"}
+
                   <ChevronsUpDown className="size-4 opacity-50" />
                 </Button>
               </PopoverTrigger>
@@ -240,6 +386,7 @@ export default function CheckoutPage() {
               <PopoverContent className="w-full p-0">
                 <Command>
                   <CommandInput placeholder="Search city..." />
+
                   <CommandList>
                     <CommandGroup>
                       {CITIES.map((c) => (
@@ -277,6 +424,7 @@ export default function CheckoutPage() {
               }`}
             >
               <MapPin className="size-4" />
+
               {locationLoading
                 ? "Getting location..."
                 : location
@@ -285,22 +433,49 @@ export default function CheckoutPage() {
             </Button>
 
             {location && (
-              <p className="text-xs text-green-600">GPS saved successfully</p>
+              <p className="text-xs text-green-600">
+                GPS saved successfully
+              </p>
             )}
 
             {showBikeOptions && (
               <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
-                <p className="text-sm font-bold text-slate-900">Bike engine size</p>
+
+                <p className="text-sm font-bold text-slate-900">
+                  Bike engine size
+                </p>
+
                 <p className="mt-1 text-xs text-slate-500">
                   Optional — helps us confirm the right seat cover fit
                 </p>
+
                 <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
                   {[
-                    { label: "70cc", state: bike70, set: setBike70 },
-                    { label: "100cc", state: bike100, set: setBike100 },
-                    { label: "110cc", state: bike110, set: setBike110 },
-                    { label: "125cc", state: bike125, set: setBike125 },
-                    { label: "150cc", state: bike150, set: setBike150 },
+                    {
+                      label: "70cc",
+                      state: bike70,
+                      set: setBike70,
+                    },
+                    {
+                      label: "100cc",
+                      state: bike100,
+                      set: setBike100,
+                    },
+                    {
+                      label: "110cc",
+                      state: bike110,
+                      set: setBike110,
+                    },
+                    {
+                      label: "125cc",
+                      state: bike125,
+                      set: setBike125,
+                    },
+                    {
+                      label: "150cc",
+                      state: bike150,
+                      set: setBike150,
+                    },
                   ].map((b) => (
                     <label
                       key={b.label}
@@ -309,9 +484,12 @@ export default function CheckoutPage() {
                       <input
                         type="checkbox"
                         checked={b.state}
-                        onChange={(e) => b.set(e.target.checked)}
+                        onChange={(e) =>
+                          b.set(e.target.checked)
+                        }
                         className="accent-orange-500"
                       />
+
                       {b.label}
                     </label>
                   ))}
@@ -321,15 +499,19 @@ export default function CheckoutPage() {
           </div>
         </div>
 
+        {/* RIGHT */}
         <aside className="lg:sticky lg:top-24 lg:self-start">
           <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+
             <div className="mb-4 flex items-center gap-2 text-sm font-bold text-slate-900">
               <ShoppingBag className="size-4 text-orange-500" />
               Order summary
             </div>
 
             {cart.length === 0 ? (
-              <p className="text-sm text-slate-500">Your cart is empty.</p>
+              <p className="text-sm text-slate-500">
+                Your cart is empty.
+              </p>
             ) : (
               <ul className="space-y-3">
                 {cart.map((item) => (
@@ -346,23 +528,36 @@ export default function CheckoutPage() {
                         sizes="56px"
                       />
                     </div>
+
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold text-slate-900">
                         {item.name}
                       </p>
+
                       {item.color && (
                         <p className="truncate text-xs capitalize text-slate-500">
                           {item.color}
-                          {item.size ? ` · ${item.size}` : ""}
+                          {item.size
+                            ? ` · ${item.size}`
+                            : ""}
                         </p>
                       )}
+
                       {!item.color && item.size && (
-                        <p className="truncate text-xs text-slate-500">{item.size}</p>
+                        <p className="truncate text-xs text-slate-500">
+                          {item.size}
+                        </p>
                       )}
-                      <p className="text-xs text-slate-500">Qty: {item.quantity}</p>
+
+                      <p className="text-xs text-slate-500">
+                        Qty: {item.quantity}
+                      </p>
                     </div>
+
                     <p className="shrink-0 text-sm font-bold text-orange-600">
-                      {formatPrice(item.price * item.quantity)}
+                      {formatPrice(
+                        item.price * item.quantity
+                      )}
                     </p>
                   </li>
                 ))}
@@ -370,16 +565,25 @@ export default function CheckoutPage() {
             )}
 
             <div className="mt-4 flex items-center justify-between rounded-xl bg-slate-900 px-4 py-3 text-white">
-              <span className="font-semibold">Total</span>
-              <span className="text-lg font-black">{formatPrice(total)}</span>
+              <span className="font-semibold">
+                Total
+              </span>
+
+              <span className="text-lg font-black">
+                {formatPrice(total)}
+              </span>
             </div>
 
             <Button
               onClick={handlePlaceOrder}
-              disabled={loading || cart.length === 0}
+              disabled={
+                loading || cart.length === 0
+              }
               className="mt-4 h-12 w-full rounded-xl bg-orange-500 text-base font-bold hover:bg-orange-600"
             >
-              {loading ? "Placing order..." : "Confirm order"}
+              {loading
+                ? "Placing order..."
+                : "Confirm order"}
             </Button>
           </div>
         </aside>
