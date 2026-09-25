@@ -685,295 +685,447 @@ export default function AdminOrdersPage() {
    * BOOK SHIPMENT
    */
 
-  async function bookShipment(
-    order: Order
+async function bookShipment(
+  order: Order
+) {
+  if (order.dispatched) {
+    showError(
+      "This order has already been booked."
+    )
+    return
+  }
+
+  if (
+    getOrderStatus(order) !==
+    "confirmed"
   ) {
-    if (order.dispatched) {
-      showError(
-        "This order has already been booked."
-      )
-      return
+    showError(
+      "Please confirm the order before booking shipment."
+    )
+    return
+  }
+
+  const isRainOrder =
+    isRainCategoryOrder(order)
+
+  /*
+   * Rain Suit / Rain Coat:
+   * Always PostEx + KHAN_ZAIB.
+   */
+
+  const effectiveProvider =
+    isRainOrder
+      ? "postex"
+      : order.courier_provider ||
+        "postex"
+
+  const accountKey =
+    isRainOrder
+      ? "KHAN_ZAIB"
+      : undefined
+
+  try {
+    setActionLoading(
+      `book-${order.id}`
+    )
+
+    setError("")
+
+    const totalItems =
+      order.items?.reduce(
+        (sum, item) =>
+          sum +
+          Number(
+            item.quantity || 1
+          ),
+        0
+      ) || 1
+
+    const totalWeight = Math.max(
+      totalItems * 0.3,
+      0.5
+    )
+
+    const orderDetail =
+      getProductDetails(order)
+
+    const payload: Record<
+      string,
+      any
+    > = {
+      orderId: order.id,
+
+      orderRefNumber:
+        `BIN-${order.id
+          .slice(0, 8)
+          .toUpperCase()}`,
+
+      invoicePayment:
+        String(order.total),
+
+      orderDetail,
+
+      customerName:
+        order.name,
+
+      customerPhone:
+        order.phone,
+
+      deliveryAddress:
+        order.address,
+
+      transactionNotes:
+        "Allowed To Open",
+
+      cityName:
+        order.city,
+
+      invoiceDivision: 1,
+
+      items: totalItems,
+
+      weight: totalWeight,
+
+      orderType: "Normal",
+
+      pickupAddressCode:
+        "001",
+
+      pickupAddress:
+        "House # 44 5/f1 Orangi Town Karachi",
     }
 
-    if (
-      getOrderStatus(order) !==
-      "confirmed"
-    ) {
-      showError(
-        "Please confirm the order before booking shipment."
-      )
-      return
+    if (accountKey) {
+      payload.accountKey =
+        accountKey
     }
 
-    const isRainOrder =
-      isRainCategoryOrder(order)
+    const endpoint =
+      effectiveProvider ===
+      "nextstep"
+        ? "/api/nextstep/create"
+        : "/api/postex/create"
 
-    /*
-     * Rain Suit / Rain Coat:
-     * Always PostEx + KHAN_ZAIB.
-     */
-
-    const effectiveProvider =
-      isRainOrder
-        ? "postex"
-        : order.courier_provider ||
-          "postex"
-
-    const accountKey =
-      isRainOrder
-        ? "KHAN_ZAIB"
-        : undefined
-
-    try {
-      setActionLoading(
-        `book-${order.id}`
-      )
-
-      setError("")
-
-      const totalItems =
-        order.items?.reduce(
-          (sum, item) =>
-            sum +
-            Number(
-              item.quantity || 1
-            ),
-          0
-        ) || 1
-
-      const totalWeight = Math.max(
-        totalItems * 0.3,
-        0.5
-      )
-
-      const orderDetail =
-        getProductDetails(order)
-
-      const payload: Record<
-        string,
-        any
-      > = {
-        orderId: order.id,
-
-        orderRefNumber:
-          `BIN-${order.id
-            .slice(0, 8)
-            .toUpperCase()}`,
-
-        invoicePayment:
-          String(order.total),
-
-        orderDetail,
-
-        customerName:
-          order.name,
-
-        customerPhone:
-          order.phone,
-
-        deliveryAddress:
-          order.address,
-
-        transactionNotes:
-          "Allowed To Open",
-
-        cityName:
-          order.city,
-
-        invoiceDivision: 1,
-
-        items: totalItems,
-
-        weight: totalWeight,
-
-        orderType: "Normal",
-
-        pickupAddressCode:
-          "001",
-
-        pickupAddress:
-          "House # 44 5/f1 Orangi Town Karachi",
+    console.log(
+      "Courier booking:",
+      {
+        endpoint,
+        provider:
+          effectiveProvider,
+        payload,
       }
+    )
 
-      if (accountKey) {
-        payload.accountKey =
-          accountKey
-      }
+    // ========================================================
+    // BOOK COURIER
+    // ========================================================
 
-      const endpoint =
-        effectiveProvider ===
-        "nextstep"
-          ? "/api/nextstep/create"
-          : "/api/postex/create"
-
-      console.log(
-        "Courier booking:",
+    const response =
+      await fetch(
+        endpoint,
         {
-          endpoint,
-          provider:
-            effectiveProvider,
-          payload,
+          method: "POST",
+
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+
+          body: JSON.stringify(
+            payload
+          ),
         }
       )
 
-      const response =
-        await fetch(
-          endpoint,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-            body: JSON.stringify(
-              payload
-            ),
-          }
-        )
+    const result =
+      await response.json()
 
-      const result =
-        await response.json()
-
-      if (!response.ok) {
-        throw new Error(
-          result?.statusMessage ||
-            result?.message ||
-            "Courier booking failed."
-        )
-      }
-
-      console.log(
-        "Courier response:",
-        result
+    if (!response.ok) {
+      throw new Error(
+        result?.statusMessage ||
+          result?.message ||
+          "Courier booking failed."
       )
+    }
 
-      const dist =
-        result?.dist || {}
+    console.log(
+      "Courier response:",
+      result
+    )
 
-      const trackingNumber =
-        dist?.trackingNumber ||
-        dist?.tracking_number ||
-        dist?.trackingNo ||
-        dist?.order
-          ?.trackingNumber ||
-        dist?.order
-          ?.tracking_number ||
-        result?.trackingNumber ||
-        result?.tracking_number ||
-        null
+    // ========================================================
+    // GET TRACKING NUMBER
+    // ========================================================
 
-      const updatePayload: Record<
-        string,
-        unknown
-      > = {
+    const dist =
+      result?.dist || {}
+
+    const trackingNumber =
+      dist?.trackingNumber ||
+      dist?.tracking_number ||
+      dist?.trackingNo ||
+      dist?.order
+        ?.trackingNumber ||
+      dist?.order
+        ?.tracking_number ||
+      result?.trackingNumber ||
+      result?.tracking_number ||
+      null
+
+    // ========================================================
+    // UPDATE SUPABASE
+    // ========================================================
+
+    const updatePayload: Record<
+      string,
+      unknown
+    > = {
+      dispatched: true,
+
+      order_status:
+        "confirmed",
+
+      tracking_number:
+        trackingNumber,
+
+      courier_provider:
+        effectiveProvider,
+    }
+
+    let {
+      error: updateError,
+    } =
+      await supabaseClient
+        .from("orders")
+        .update(
+          updatePayload
+        )
+        .eq("id", order.id)
+
+    /*
+     * Compatibility fallback if
+     * courier_provider doesn't exist.
+     */
+
+    if (
+      updateError &&
+      updateError.message
+        ?.toLowerCase()
+        .includes(
+          "courier_provider"
+        )
+    ) {
+      const fallbackPayload = {
         dispatched: true,
+
         order_status:
           "confirmed",
+
         tracking_number:
           trackingNumber,
-        courier_provider:
-          effectiveProvider,
       }
 
-      let {
-        error: updateError,
-      } =
+      const fallback =
         await supabaseClient
           .from("orders")
           .update(
-            updatePayload
+            fallbackPayload
           )
           .eq("id", order.id)
 
+      updateError =
+        fallback.error
+    }
+
+    if (updateError) {
+      throw updateError
+    }
+
+    // ========================================================
+    // UPDATE LOCAL ORDER STATE
+    // ========================================================
+
+    setOrders((current) =>
+      current.map((item) =>
+        item.id === order.id
+          ? {
+              ...item,
+
+              dispatched:
+                true,
+
+              order_status:
+                "confirmed",
+
+              tracking_number:
+                trackingNumber,
+
+              courier_provider:
+                effectiveProvider,
+            }
+          : item
+      )
+    )
+
+    if (
+      selectedOrder?.id ===
+      order.id
+    ) {
+      setSelectedOrder({
+        ...selectedOrder,
+
+        dispatched: true,
+
+        order_status:
+          "confirmed",
+
+        tracking_number:
+          trackingNumber,
+
+        courier_provider:
+          effectiveProvider,
+      })
+    }
+
+    // ========================================================
+    // SEND DISPATCH WHATSAPP MESSAGE
+    // ========================================================
+
+    if (trackingNumber) {
+      try {
+        const trackingLink =
+          effectiveProvider ===
+          "nextstep"
+            ? "https://nextstepcourier.com/"
+            : "https://postex.pk/tracking"
+
+        console.log(
+          "📱 Sending dispatch WhatsApp message:",
+          {
+            orderId:
+              order.id,
+
+            phone:
+              order.phone,
+
+            trackingNumber,
+
+            courier:
+              effectiveProvider,
+
+            trackingLink,
+          }
+        )
+
+        const whatsappResponse =
+          await fetch(
+            "/api/whatsapp/dispatch",
+            {
+              method: "POST",
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+
+              body:
+                JSON.stringify({
+                  phone:
+                    order.phone,
+
+                  orderId:
+                    order.id,
+
+                  trackingNumber:
+                    trackingNumber,
+
+                  courier:
+                    effectiveProvider ===
+                    "nextstep"
+                      ? "NextStep"
+                      : "PostEx",
+
+                  trackingLink:
+                    trackingLink,
+                }),
+            }
+          )
+
+        const whatsappResult =
+          await whatsappResponse.json()
+
+        if (
+          !whatsappResponse.ok
+        ) {
+          console.error(
+            "❌ Dispatch WhatsApp failed:",
+            whatsappResult
+          )
+
+          /*
+           * Courier booking succeeded.
+           * WhatsApp failed, so we DON'T
+           * undo the shipment booking.
+           */
+          showMessage(
+            trackingNumber
+              ? `Shipment booked. Tracking: ${trackingNumber}. WhatsApp notification failed.`
+              : "Shipment booked successfully, but WhatsApp notification failed."
+          )
+        } else {
+          console.log(
+            "✅ Dispatch WhatsApp sent:",
+            whatsappResult
+          )
+
+          showMessage(
+            trackingNumber
+              ? `Shipment booked and WhatsApp sent. Tracking: ${trackingNumber}`
+              : "Shipment booked and WhatsApp notification sent."
+          )
+        }
+      } catch (whatsappError) {
+        /*
+         * Courier booking already succeeded.
+         * Do not treat WhatsApp failure as
+         * courier booking failure.
+         */
+
+        console.error(
+          "❌ Dispatch WhatsApp request error:",
+          whatsappError
+        )
+
+        showMessage(
+          trackingNumber
+            ? `Shipment booked. Tracking: ${trackingNumber}. WhatsApp notification could not be sent.`
+            : "Shipment booked successfully, but WhatsApp notification could not be sent."
+        )
+      }
+    } else {
       /*
-       * Compatibility fallback if
-       * courier_provider doesn't exist.
+       * Courier booking succeeded but
+       * no tracking number was returned.
        */
 
-      if (
-        updateError &&
-        updateError.message
-          ?.toLowerCase()
-          .includes(
-            "courier_provider"
-          )
-      ) {
-        const fallbackPayload = {
-          dispatched: true,
-          order_status:
-            "confirmed",
-          tracking_number:
-            trackingNumber,
-        }
-
-        const fallback =
-          await supabaseClient
-            .from("orders")
-            .update(
-              fallbackPayload
-            )
-            .eq("id", order.id)
-
-        updateError =
-          fallback.error
-      }
-
-      if (updateError) {
-        throw updateError
-      }
-
-      setOrders((current) =>
-        current.map((item) =>
-          item.id === order.id
-            ? {
-                ...item,
-                dispatched: true,
-                order_status:
-                  "confirmed",
-                tracking_number:
-                  trackingNumber,
-                courier_provider:
-                  effectiveProvider,
-              }
-            : item
-        )
-      )
-
-      if (
-        selectedOrder?.id ===
-        order.id
-      ) {
-        setSelectedOrder({
-          ...selectedOrder,
-          dispatched: true,
-          order_status:
-            "confirmed",
-          tracking_number:
-            trackingNumber,
-          courier_provider:
-            effectiveProvider,
-        })
-      }
-
       showMessage(
-        trackingNumber
-          ? `Shipment booked successfully. Tracking: ${trackingNumber}`
-          : "Shipment booked successfully."
+        "Shipment booked successfully, but no tracking number was returned. WhatsApp notification was not sent."
       )
-    } catch (err: any) {
-      console.error(
-        "Courier booking error:",
-        err
-      )
-
-      showError(
-        err?.message ||
-          "Unable to book shipment."
-      )
-    } finally {
-      setActionLoading(null)
     }
+  } catch (err: any) {
+    console.error(
+      "Courier booking error:",
+      err
+    )
+
+    showError(
+      err?.message ||
+        "Unable to book shipment."
+    )
+  } finally {
+    setActionLoading(null)
   }
+}
 
   /*
    * DELETE
