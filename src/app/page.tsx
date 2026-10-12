@@ -36,8 +36,13 @@ export default function HomePage() {
     },
     {
       name: "Rain Suites",
-      image: "/images/rain-suite-black.png",
+      image: "/images/rain-suite-blue2.png",
       href: "/category/Rain%20Suites",
+    },
+    {
+      name: "Shawls",
+      image: "/images/shallhalfwhite.jpeg",
+      href: "/category/Shawls",
     },
     {
       name: "Rexine",
