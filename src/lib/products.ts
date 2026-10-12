@@ -869,7 +869,7 @@ Available in Small, Medium & Large`,
 
  {
     id: "Sh1",
-    name: "Shawl Haf White",
+    name: "Shawl",
     price: 3500,
     image: "/images/shallhalfwhite.jpeg",
     category: "Shawls",
@@ -878,14 +878,14 @@ Open parcel allowed`,
     quantity: 1,
 
     colors: [
-      { name: "Skyblue", image: "/images/shallhalfwhite.jpeg", default: true },
-      { name: "Black", image: "/images/shallwhite.jpg" },
+      { name: "Half White", image: "/images/shallhalfwhite.jpeg", default: true },
+      { name: "White", image: "/images/shallwhite.jpg" },
     
     ],
   },
 {
     id: "Sh2",
-    name: "ShawlWhite",
+    name: "Shawl",
     price: 3500,
     image: "/images/shallwhite.jpg",
     category: "Shawls",
@@ -894,8 +894,8 @@ Open parcel allowed`,
     quantity: 1,
 
     colors: [
-      { name: "Skyblue", image: "/images/shallwhite.jpg", default: true },
-      { name: "Black", image: "/images/shallhalfwhite.png" },
+      { name: "White", image: "/images/shallwhite.jpg", default: true },
+      { name: "Half White", image: "/images/shallhalfwhite.png" },
     
     ],
   },
