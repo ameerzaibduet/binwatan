@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { useCart } from "@/lib/use-cart"
 import { supabase } from "@/lib/supabase"
+import { Products } from "@/lib/products"
 import {
   Popover,
   PopoverTrigger,
@@ -46,7 +47,6 @@ export default function CheckoutPage() {
   const [hydrated, setHydrated] = useState(false)
   const [name, setName] = useState("")
   const [number, setNumber] = useState("")
-  const [email, setEmail] = useState("")
   const [city, setCity] = useState("")
   const [address, setAddress] = useState("")
   const [loading, setLoading] = useState(false)
@@ -85,7 +85,13 @@ export default function CheckoutPage() {
 
   const hasTopCover = cartContainsTopCover(cart)
   const hasRainSuit = cartContainsRainSuit(cart)
-  const showBikeOptions = !hasTopCover && !hasRainSuit
+  const hasShawl = cart.some(
+    (item) =>
+      Products.find((p) => p.id === item.id)
+        ?.category?.trim()
+        .toLowerCase() === "shawls"
+  )
+  const showBikeOptions = !hasTopCover && !hasRainSuit && !hasShawl
 
   const getLocation = () => {
     if (!navigator.geolocation) {
@@ -146,7 +152,6 @@ export default function CheckoutPage() {
       const order = {
         name,
         phone: number,
-        email: email || null,
         city,
         address,
 
@@ -169,7 +174,6 @@ export default function CheckoutPage() {
 
         dispatched: false,
 
-        // IMPORTANT:
         // New orders start as pending.
         order_status: "pending",
       }
@@ -255,7 +259,6 @@ export default function CheckoutPage() {
               items: whatsappItems,
               total: data.total,
 
-              // VERY IMPORTANT
               // Send the Supabase order ID to our API.
               orderId: data.id,
             }),
@@ -288,7 +291,6 @@ export default function CheckoutPage() {
       // ============================================
 
       await identifyTikTokCustomer({
-        email,
         phone: number,
       })
 
@@ -355,16 +357,6 @@ export default function CheckoutPage() {
               name="phone"
               autoComplete="tel"
               inputMode="tel"
-              className="h-12 rounded-xl"
-            />
-
-            <Input
-              placeholder="Email address (optional)"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              type="email"
-              name="email"
-              autoComplete="email"
               className="h-12 rounded-xl"
             />
 

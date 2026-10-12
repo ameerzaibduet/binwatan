@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Check, ChevronsUpDown } from "lucide-react"
+import { Check, ChevronsUpDown, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Popover,
@@ -27,6 +27,23 @@ type PickupLocation = {
   city: string
 }
 
+const emptyForm = {
+  customerName: "",
+  customerPhone: "",
+  deliveryAddress: "",
+  cityName: "",
+  invoicePayment: "",
+  orderDetail: "",
+  items: 1,
+  weight: 0.5,
+}
+
+// 👇 Verify both formats by opening a real tracking page for each courier
+const getTrackingLink = (provider: string, trackingNumber: string) =>
+  provider === "nextstep"
+    ? `https://YOUR-NEXTSTEP-TRACKING-URL/${trackingNumber}`
+    : `https://postex.pk/tracking?cn=${trackingNumber}`
+
 export default function CreateManualOrder() {
   const { provider } = useCourierProvider()
   const [account, setAccount] = useState("Khan Zaib")
@@ -35,17 +52,9 @@ export default function CreateManualOrder() {
   const [pickupLocations, setPickupLocations] = useState<PickupLocation[]>([])
   const [pickupLocationId, setPickupLocationId] = useState("")
   const [syncing, setSyncing] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
 
-  const [form, setForm] = useState({
-    customerName: "",
-    customerPhone: "",
-    deliveryAddress: "",
-    cityName: "",
-    invoicePayment: "",
-    orderDetail: "",
-    items: 1,
-    weight: 0.5,
-  })
+  const [form, setForm] = useState(emptyForm)
 
   useEffect(() => {
     if (provider !== "nextstep") return
@@ -66,42 +75,84 @@ export default function CreateManualOrder() {
   }, [provider])
 
   const submit = async () => {
+    if (submitting) return // blocks double clicks
     if (!form.cityName) return alert("Please select city")
     if (provider === "nextstep" && !pickupLocationId) {
       return alert("Please select a NextStep pickup location")
     }
 
-    const endpoint =
-      provider === "nextstep" ? "/api/nextstep/manual-create" : "/api/postex/manual-create"
+    setSubmitting(true)
 
-    const res = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...form,
-        postexAccount: account,
-        referenceId,
-        orderRefNumber: `MAN-${Date.now()}`,
-        pickupLocationId,
-        allowOpen: true,
-        transactionNotes: "Allowed To Open",
-      }),
-    })
+    try {
+      const endpoint =
+        provider === "nextstep"
+          ? "/api/nextstep/manual-create"
+          : "/api/postex/manual-create"
 
-    const data = await res.json()
-    if (!data.success) return alert(data.error || data.statusMessage)
+      // keep a copy: the form is cleared after success
+      const submitted = { ...form }
 
-    alert(`✅ Order Created (${provider})\nTracking: ${data.trackingNumber}`)
-    setForm({
-      customerName: "",
-      customerPhone: "",
-      deliveryAddress: "",
-      cityName: "",
-      invoicePayment: "",
-      orderDetail: "",
-      items: 1,
-      weight: 0.5,
-    })
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...submitted,
+          postexAccount: account,
+          referenceId,
+          orderRefNumber: `MAN-${Date.now()}`,
+          pickupLocationId,
+          allowOpen: true,
+          transactionNotes: "Allowed To Open",
+        }),
+      })
+
+      const data = await res.json()
+      if (!data.success) {
+        alert(data.error || data.statusMessage || "Booking failed")
+        return
+      }
+
+      // 📲 WhatsApp dispatch message
+      // Shipment is already booked, so a failure here never fails the booking.
+      let whatsappStatus = "not sent (no tracking number)"
+
+      if (data.trackingNumber) {
+        try {
+          const waRes = await fetch("/api/whatsapp/dispatch", {
+            // 👆 change to your dispatch route path
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              orderId: data.orderId || referenceId, // see route note below
+              phone: submitted.customerPhone,
+              trackingNumber: data.trackingNumber,
+              courier: provider === "nextstep" ? "NextStep" : "PostEx",
+              trackingLink: getTrackingLink(provider, data.trackingNumber),
+            }),
+          })
+          const waData = await waRes.json()
+          whatsappStatus =
+            waRes.ok && waData.success
+              ? "sent ✅"
+              : `failed ❌ (${
+                  typeof waData.error === "string"
+                    ? waData.error
+                    : waData.error?.error?.message || "see server logs"
+                })`
+        } catch {
+          whatsappStatus = "failed ❌ (network error)"
+        }
+      }
+
+      alert(
+        `✅ Order Created (${provider})\nTracking: ${data.trackingNumber}\nWhatsApp: ${whatsappStatus}`
+      )
+      setForm(emptyForm)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Something went wrong")
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const handleSync = async () => {
@@ -148,6 +199,7 @@ export default function CreateManualOrder() {
             value={pickupLocationId}
             onChange={(e) => setPickupLocationId(e.target.value)}
             className="input"
+            disabled={submitting}
           >
             <option value="">Select Pickup Location</option>
             {pickupLocations.map((location) => (
@@ -162,6 +214,7 @@ export default function CreateManualOrder() {
               value={account}
               onChange={(e) => setAccount(e.target.value)}
               className="input"
+              disabled={submitting}
             >
               <option>Khan Zaib</option>
               <option>Nasir</option>
@@ -172,6 +225,7 @@ export default function CreateManualOrder() {
               value={referenceId}
               onChange={(e) => setReferenceId(e.target.value)}
               className="input"
+              disabled={submitting}
             >
               <option>444</option>
               <option>333</option>
@@ -186,6 +240,7 @@ export default function CreateManualOrder() {
             value={referenceId}
             onChange={(e) => setReferenceId(e.target.value)}
             className="input"
+            disabled={submitting}
           >
             <option>444</option>
             <option>333</option>
@@ -199,6 +254,7 @@ export default function CreateManualOrder() {
             className="input col-span-2"
             placeholder="Customer Name"
             value={form.customerName}
+            disabled={submitting}
             onChange={(e) => setForm({ ...form, customerName: e.target.value })}
           />
 
@@ -206,6 +262,7 @@ export default function CreateManualOrder() {
             className="input"
             placeholder="Customer Phone"
             value={form.customerPhone}
+            disabled={submitting}
             onChange={(e) => setForm({ ...form, customerPhone: e.target.value })}
           />
 
@@ -213,6 +270,7 @@ export default function CreateManualOrder() {
             className="input"
             placeholder="Invoice Amount"
             value={form.invoicePayment}
+            disabled={submitting}
             onChange={(e) => setForm({ ...form, invoicePayment: e.target.value })}
           />
 
@@ -220,12 +278,17 @@ export default function CreateManualOrder() {
             className="input col-span-2"
             placeholder="Delivery Address"
             value={form.deliveryAddress}
+            disabled={submitting}
             onChange={(e) => setForm({ ...form, deliveryAddress: e.target.value })}
           />
 
           <Popover open={cityOpen} onOpenChange={setCityOpen}>
             <PopoverTrigger asChild>
-              <Button variant="outline" className="input col-span-2 justify-between">
+              <Button
+                variant="outline"
+                className="input col-span-2 justify-between"
+                disabled={submitting}
+              >
                 {form.cityName || "Select City"}
                 <ChevronsUpDown className="h-4 w-4" />
               </Button>
@@ -257,6 +320,7 @@ export default function CreateManualOrder() {
             className="input col-span-2"
             placeholder="Order Detail"
             value={form.orderDetail}
+            disabled={submitting}
             onChange={(e) => setForm({ ...form, orderDetail: e.target.value })}
           />
 
@@ -265,6 +329,7 @@ export default function CreateManualOrder() {
             type="number"
             placeholder="Items"
             value={form.items}
+            disabled={submitting}
             onChange={(e) => setForm({ ...form, items: Number(e.target.value) })}
           />
 
@@ -274,15 +339,18 @@ export default function CreateManualOrder() {
             step="0.1"
             placeholder="Weight (kg)"
             value={form.weight}
+            disabled={submitting}
             onChange={(e) => setForm({ ...form, weight: Number(e.target.value) })}
           />
         </div>
 
         <button
           onClick={submit}
-          className="h-14 rounded-xl bg-black font-black text-white transition hover:bg-yellow-400 hover:text-black"
+          disabled={submitting}
+          className="flex h-14 items-center justify-center gap-2 rounded-xl bg-black font-black text-white transition hover:bg-yellow-400 hover:text-black disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-black disabled:hover:text-white"
         >
-          CREATE SHIPMENT
+          {submitting && <Loader2 className="h-5 w-5 animate-spin" />}
+          {submitting ? "CREATING SHIPMENT..." : "CREATE SHIPMENT"}
         </button>
       </div>
     </div>

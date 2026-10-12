@@ -48,6 +48,9 @@ export default function ProductDetailPage({ params }: Props) {
 
   const isCarTopCover = product ? isCarTopCoverProduct(product) : false
   const isRainSuit = product ? isRainSuitProduct(product) : false
+  const isShawl = product
+    ? product.category?.trim().toLowerCase() === "shawls"
+    : false
 
   const [selectedColor, setSelectedColor] = useState(
     product?.colors?.find((c) => c.default) || product?.colors?.[0]
@@ -192,7 +195,7 @@ export default function ProductDetailPage({ params }: Props) {
               </div>
             )}
 
-            {isRainSuit && (
+            {isRainSuit && !isShawl && (
               <div className="mt-5">
                 <p className="text-sm font-semibold text-slate-900">Size</p>
                 <div className="mt-2 flex flex-wrap gap-2">
@@ -244,7 +247,7 @@ export default function ProductDetailPage({ params }: Props) {
               ))}
             </ul>
 
-            {!isCarTopCover && !isRainSuit && (
+            {!isCarTopCover && !isRainSuit && !isShawl && (
               <div className="mt-5">
                 <p className="text-sm font-semibold text-slate-900">Bike engine size</p>
                 <div className="mt-2 flex flex-wrap gap-2">

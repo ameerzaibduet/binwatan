@@ -867,6 +867,38 @@ Available in Small, Medium & Large`,
     ],
   },
 
+ {
+    id: "Sh1",
+    name: "Shawl Haf White",
+    price: 3500,
+    image: "/images/shallhalfwhite.jpeg",
+    category: "Shawls",
+    description: `Free delivery
+Open parcel allowed`,
+    quantity: 1,
+
+    colors: [
+      { name: "Skyblue", image: "/images/shallhalfwhite.jpeg", default: true },
+      { name: "Black", image: "/images/shallwhite.jpg" },
+    
+    ],
+  },
+{
+    id: "Sh2",
+    name: "ShawlWhite",
+    price: 3500,
+    image: "/images/shallwhite.jpg",
+    category: "Shawls",
+    description: `Free delivery
+Open parcel allowed`,
+    quantity: 1,
+
+    colors: [
+      { name: "Skyblue", image: "/images/shallwhite.jpg", default: true },
+      { name: "Black", image: "/images/shallhalfwhite.png" },
+    
+    ],
+  },
 
   
 ]
