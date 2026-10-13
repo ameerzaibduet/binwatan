@@ -49,11 +49,7 @@ export default function HomePage() {
       image: "/rexine.png",
       href: "/category/Rexine",
     },
-    {
-      name: "Car Top",
-      image: "/images/boolan-cover2.png",
-      href: "/category/Car%20Top%20Cover",
-    },
+  
    
   ]
 

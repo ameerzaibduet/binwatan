@@ -870,7 +870,7 @@ Available in Small, Medium & Large`,
  {
     id: "Sh1",
     name: "Shawl",
-    price: 3500,
+    price: 2250,
     image: "/images/shallhalfwhite.jpeg",
     category: "Shawls",
     description: `Free delivery
@@ -886,7 +886,7 @@ Open parcel allowed`,
 {
     id: "Sh2",
     name: "Shawl",
-    price: 3500,
+    price: 2250,
     image: "/images/shallwhite.jpg",
     category: "Shawls",
     description: `Free delivery
