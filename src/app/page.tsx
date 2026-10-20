@@ -9,7 +9,7 @@ import { Minus } from "lucide-react"
 import Link from "next/link"
 
 export default function HomePage() {
-  const categoryOrder = ["Parachute", "Rexine", "Car Top Cover", "Rain Suites"]
+  const categoryOrder = ["Parachute", "Rexine", "Car Top Cover", "Rain Suites", "Japani Rexine", "Comando Covers",  "Shawls"]
   const productGroups = categoryOrder
     .map((category) => ({
       category,
@@ -38,6 +38,11 @@ export default function HomePage() {
       name: "Rain Suites",
       image: "/images/rain-suite-blue2.png",
       href: "/category/Rain%20Suites",
+    },
+     {
+      name: "Japani Rexine",
+      image: "/images/japani-rexine-gray.jpeg",
+      href: "/category/Japani%20Rexine",
     },
     {
       name: "Shawls",

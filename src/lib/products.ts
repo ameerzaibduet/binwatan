@@ -899,6 +899,43 @@ Open parcel allowed`,
     
     ],
   },
+   {
+    id: "JR-01",
+    name: "Japani Rexine Bike Cover",
+    price: 1200 ,
+    image: "/images/japani-rexine-gray.jpeg",
+    category: "Japani Rexine",
+    description: ` Free delivery
+ Open parcel allowed
+ 100% waterproof
+ 1-year warranty`,
+    quantity: 1,
+    colors: [
+      { name: "gray", image: "/images/japani-rexine-gray.jpeg", default: true },
+      { name: "black", image: "/images/japani-rexine-black.jpeg" },
+     
+
+    ]
+  },
+
+  {
+    id: "JR-02",
+    name: "Japani Rexine Bike Cover",
+    price: 1200 ,
+    image: "/images/japani-rexine-black.jpeg",
+    category: "Japani Rexine",
+    description: ` Free delivery
+ Open parcel allowed
+ 100% waterproof
+ 1-year warranty`,
+    quantity: 1,
+    colors: [
+      { name: "black", image: "/images/japani-rexine-black.jpeg", default: true },
+      { name: "gray", image: "/images/japani-rexine-gray.jpeg" },
+     
+
+    ]
+  },
 
   
 ]
