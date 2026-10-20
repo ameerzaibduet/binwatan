@@ -902,7 +902,7 @@ Open parcel allowed`,
    {
     id: "JR-01",
     name: "Japani Rexine Bike Cover",
-    price: 1200 ,
+    price: 2200 ,
     image: "/images/japani-rexine-gray.jpeg",
     category: "Japani Rexine",
     description: ` Free delivery
@@ -921,7 +921,7 @@ Open parcel allowed`,
   {
     id: "JR-02",
     name: "Japani Rexine Bike Cover",
-    price: 1200 ,
+    price: 2200 ,
     image: "/images/japani-rexine-black.jpeg",
     category: "Japani Rexine",
     description: ` Free delivery
