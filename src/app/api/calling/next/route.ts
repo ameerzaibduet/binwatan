@@ -60,13 +60,14 @@ export async function GET(req: NextRequest) {
       .eq("call_status", "calling")
       .lt("last_call_at", staleBefore)
 
-    // Next customer: in queue, still pending, not dispatched, attempts left, due now
+    // Next customer: in queue, pending or confirmed (never cancelled), not dispatched,
+    // attempts left, due now
     const { data: candidates, error: candidateError } = await db
       .from("orders")
       .select("*")
       .eq("in_call_queue", true)
       .eq("dispatched", false)
-      .or("order_status.eq.pending,order_status.is.null")
+      .or("order_status.eq.pending,order_status.eq.confirmed,order_status.is.null")
       .in("call_status", ["not_called", "no_answer", "callback"])
       .lt("call_attempts", state.max_attempts)
       .or(`next_call_at.is.null,next_call_at.lte.${nowIso}`)

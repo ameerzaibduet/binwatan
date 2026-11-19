@@ -23,6 +23,11 @@ import {
   Settings,
   Ban,
   RotateCcw,
+  Pencil,
+  Save,
+  Trash2,
+  Laptop,
+  Smartphone,
 } from "lucide-react"
 
 type CallStatus =
@@ -34,7 +39,9 @@ type CallStatus =
   | "failed"
 
 type OrderItem = {
+  id?: string
   name?: string
+  price?: number
   quantity?: number
   color?: string | null
   size?: string | null
@@ -44,10 +51,12 @@ type QueueOrder = {
   id: string
   name: string
   phone: string
+  email?: string | null
   city: string
   address: string
   items: OrderItem[]
   total: number
+  bike_specifications?: string | null
   order_status?: string | null
   dispatched: boolean
   created_at: string
@@ -78,10 +87,35 @@ type CallAttempt = {
 
 type ListFilter = "available" | "queued" | "all"
 
+type OrderTypeFilter = "all" | "pending" | "confirmed"
+
+// phone = the Android app dials automatically; laptop = you click to dial from this computer
+type CallMode = "phone" | "laptop"
+
+// 03001234567 -> +923001234567, 923001234567 -> +923001234567
+function toDialNumber(phone: string) {
+  const raw = String(phone || "").trim()
+  const digits = raw.replace(/\D/g, "")
+
+  if (!digits) {
+    return ""
+  }
+
+  if (digits.startsWith("92")) {
+    return `+${digits}`
+  }
+
+  if (digits.startsWith("0")) {
+    return `+92${digits.slice(1)}`
+  }
+
+  return raw.startsWith("+") ? `+${digits}` : digits
+}
+
 const POLL_MS = 4000
 
 const ORDER_COLUMNS =
-  "id,name,phone,city,address,items,total,order_status,dispatched,created_at,in_call_queue,call_status,call_attempts,last_call_at,next_call_at"
+  "id,name,phone,email,city,address,items,total,bike_specifications,order_status,dispatched,created_at,in_call_queue,call_status,call_attempts,last_call_at,next_call_at"
 
 const STATUS_STYLES: Record<CallStatus, { label: string; classes: string }> = {
   not_called: {
@@ -121,6 +155,17 @@ const OUTCOME_CLASSES: Record<string, string> = {
 
 function callStatusOf(order: QueueOrder): CallStatus {
   return order.call_status || "not_called"
+}
+
+function isConfirmed(order: QueueOrder) {
+  return order.order_status === "confirmed"
+}
+
+function itemsTotal(items: OrderItem[]) {
+  return (items || []).reduce(
+    (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 1),
+    0
+  )
 }
 
 function capitalize(text: string) {
@@ -177,6 +222,21 @@ export default function CallingQueuePage() {
 
   const [busy, setBusy] = useState<string | null>(null)
 
+  const [typeFilter, setTypeFilter] = useState<OrderTypeFilter>("all")
+  const [editingOrder, setEditingOrder] = useState<QueueOrder | null>(null)
+
+  const [mode, setMode] = useState<CallMode>("phone")
+
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem("calling_mode") === "laptop") {
+        setMode("laptop")
+      }
+    } catch {
+      // browser storage not available
+    }
+  }, [])
+
   const [message, setMessage] = useState("")
   const [error, setError] = useState("")
 
@@ -207,7 +267,9 @@ export default function CallingQueuePage() {
           .from("orders")
           .select(ORDER_COLUMNS)
           .eq("dispatched", false)
-          .or("order_status.eq.pending,order_status.is.null")
+          .or(
+            "order_status.eq.pending,order_status.eq.confirmed,order_status.is.null"
+          )
           .order("created_at", { ascending: false })
           .limit(1000),
 
@@ -318,6 +380,41 @@ export default function CallingQueuePage() {
     [orders]
   )
 
+  const notInQueuePending = useMemo(
+    () => notInQueue.filter((order) => !isConfirmed(order)),
+    [notInQueue]
+  )
+
+  const notInQueueConfirmed = useMemo(
+    () => notInQueue.filter((order) => isConfirmed(order)),
+    [notInQueue]
+  )
+
+  // Laptop mode: the customer who is due next (same order the phone app would use).
+  const nextDue = useMemo(() => {
+    const now = Date.now()
+
+    const due = waitingToCall.filter(
+      (order) =>
+        !order.next_call_at || new Date(order.next_call_at).getTime() <= now
+    )
+
+    due.sort((a, b) => {
+      const aTime = a.next_call_at ? new Date(a.next_call_at).getTime() : 0
+      const bTime = b.next_call_at ? new Date(b.next_call_at).getTime() : 0
+
+      if (aTime !== bTime) {
+        return aTime - bTime
+      }
+
+      return (
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      )
+    })
+
+    return due[0]
+  }, [waitingToCall])
+
   const visibleOrders = useMemo(() => {
     const query = search.trim().toLowerCase()
 
@@ -332,6 +429,14 @@ export default function CallingQueuePage() {
         return false
       }
 
+      if (typeFilter === "pending" && isConfirmed(order)) {
+        return false
+      }
+
+      if (typeFilter === "confirmed" && !isConfirmed(order)) {
+        return false
+      }
+
       if (!query) {
         return true
       }
@@ -342,7 +447,7 @@ export default function CallingQueuePage() {
         .toLowerCase()
         .includes(query)
     })
-  }, [orders, search, listFilter])
+  }, [orders, search, listFilter, typeFilter])
 
   const ordersById = useMemo(() => {
     const map = new Map<string, QueueOrder>()
@@ -515,11 +620,18 @@ export default function CallingQueuePage() {
     })
   }
 
+  // After a call is handled, clear the "answered" flag so the order leaves that list.
   function confirmAnswered(order: QueueOrder) {
     runAction(`confirm-${order.id}`, async () => {
       const { error: confirmError } = await supabaseClient
         .from("orders")
-        .update({ order_status: "confirmed", in_call_queue: false })
+        .update({
+          order_status: "confirmed",
+          in_call_queue: false,
+          call_status: "not_called",
+          call_attempts: 0,
+          next_call_at: null,
+        })
         .eq("id", order.id)
 
       if (confirmError) {
@@ -527,6 +639,108 @@ export default function CallingQueuePage() {
       }
 
       return `Order of ${order.name} confirmed.`
+    })
+  }
+
+  // For orders that were already confirmed: just clear them from the answered list.
+  function markDone(order: QueueOrder) {
+    runAction(`done-${order.id}`, async () => {
+      await updateOrders([order.id], {
+        in_call_queue: false,
+        call_status: "not_called",
+        call_attempts: 0,
+        next_call_at: null,
+      })
+
+      return `${order.name} marked as done.`
+    })
+  }
+
+  /*
+   * EDIT ORDER (works during a call: changes name, phone, address, products, total)
+   */
+
+  function updateEditingItem(
+    index: number,
+    field: keyof OrderItem,
+    value: string | number
+  ) {
+    if (!editingOrder) {
+      return
+    }
+
+    const items = [...(editingOrder.items || [])]
+
+    items[index] = {
+      ...items[index],
+      [field]: value,
+    }
+
+    setEditingOrder({ ...editingOrder, items })
+  }
+
+  function removeEditingItem(index: number) {
+    if (!editingOrder) {
+      return
+    }
+
+    setEditingOrder({
+      ...editingOrder,
+      items: (editingOrder.items || []).filter(
+        (_, itemIndex) => itemIndex !== index
+      ),
+    })
+  }
+
+  function addEditingItem() {
+    if (!editingOrder) {
+      return
+    }
+
+    setEditingOrder({
+      ...editingOrder,
+      items: [
+        ...(editingOrder.items || []),
+        { name: "", price: 0, quantity: 1, color: "", size: "" },
+      ],
+    })
+  }
+
+  function saveEdit() {
+    if (!editingOrder) {
+      return
+    }
+
+    const order = editingOrder
+
+    runAction(`edit-${order.id}`, async () => {
+      const cleanedItems = (order.items || []).map((item) => ({
+        ...item,
+        price: Number(item.price || 0),
+        quantity: Number(item.quantity || 1),
+      }))
+
+      const { error: editError } = await supabaseClient
+        .from("orders")
+        .update({
+          name: order.name,
+          phone: order.phone,
+          email: order.email || null,
+          city: order.city,
+          address: order.address,
+          total: Number(order.total),
+          bike_specifications: order.bike_specifications || null,
+          items: cleanedItems,
+        })
+        .eq("id", order.id)
+
+      if (editError) {
+        throw editError
+      }
+
+      setEditingOrder(null)
+
+      return "Order updated."
     })
   }
 
@@ -558,6 +772,122 @@ export default function CallingQueuePage() {
       }
 
       return `Order of ${order.name} cancelled.`
+    })
+  }
+
+  /*
+   * CALL MODE + LAPTOP CALLING
+   *
+   * In laptop mode the Android app is not used: you click "Call from laptop",
+   * the computer's calling app (for example Phone Link) dials, and you tell the
+   * page how the call went.
+   */
+
+  function changeMode(next: CallMode) {
+    setMode(next)
+
+    try {
+      window.localStorage.setItem("calling_mode", next)
+    } catch {
+      // browser storage not available
+    }
+
+    // The phone app must not dial by itself while you are calling from the laptop.
+    if (next === "laptop" && state?.running) {
+      stopQueue()
+    }
+  }
+
+  // Runs when you click "Call from laptop" (the dial link opens by itself).
+  function laptopDialStarted(order: QueueOrder) {
+    const attemptNumber = Number(order.call_attempts || 0) + 1
+
+    runAction(`laptop-${order.id}`, async () => {
+      const { error: orderError } = await supabaseClient
+        .from("orders")
+        .update({
+          call_status: "calling",
+          call_attempts: attemptNumber,
+          last_call_at: new Date().toISOString(),
+          next_call_at: null,
+        })
+        .eq("id", order.id)
+
+      if (orderError) {
+        throw orderError
+      }
+
+      // sim_slot -1 means "dialed from the laptop"
+      const { error: attemptError } = await supabaseClient
+        .from("call_attempts")
+        .insert({
+          order_id: String(order.id),
+          phone: order.phone,
+          attempt_number: attemptNumber,
+          sim_slot: -1,
+          notes: "Dialed from laptop",
+        })
+
+      if (attemptError) {
+        throw attemptError
+      }
+    })
+  }
+
+  function finishLaptopCall(
+    order: QueueOrder,
+    outcome: "answered" | "no_answer" | "callback" | "failed"
+  ) {
+    runAction(`finish-${order.id}`, async () => {
+      const now = Date.now()
+      const nowIso = new Date(now).toISOString()
+      const retryMinutes = state?.retry_after_minutes ?? 120
+
+      // Close the latest open call record for this order.
+      const { data: openAttempts, error: openError } = await supabaseClient
+        .from("call_attempts")
+        .select("id")
+        .eq("order_id", String(order.id))
+        .eq("outcome", "calling")
+        .order("started_at", { ascending: false })
+        .limit(1)
+
+      if (openError) {
+        throw openError
+      }
+
+      if (openAttempts && openAttempts.length > 0) {
+        const { error: closeError } = await supabaseClient
+          .from("call_attempts")
+          .update({ outcome, ended_at: nowIso })
+          .eq("id", openAttempts[0].id)
+
+        if (closeError) {
+          throw closeError
+        }
+      }
+
+      let patch: Record<string, unknown>
+
+      if (outcome === "answered") {
+        patch = { call_status: "answered", in_call_queue: false, next_call_at: null }
+      } else if (outcome === "no_answer") {
+        patch = {
+          call_status: "no_answer",
+          next_call_at: new Date(now + retryMinutes * 60000).toISOString(),
+        }
+      } else if (outcome === "callback") {
+        patch = {
+          call_status: "callback",
+          next_call_at: new Date(now + 30 * 60000).toISOString(),
+        }
+      } else {
+        patch = { call_status: "failed", next_call_at: null }
+      }
+
+      await updateOrders([order.id], patch)
+
+      return "Call saved."
     })
   }
 
@@ -621,7 +951,7 @@ export default function CallingQueuePage() {
             </h1>
 
             <p className="mt-1 text-sm text-gray-500">
-              Auto-call pending orders from your phone, one customer at a time
+              Auto-call pending and confirmed orders from your phone, one customer at a time
             </p>
           </div>
 
@@ -669,6 +999,38 @@ export default function CallingQueuePage() {
             {/* CONTROL */}
 
             <div className="mb-5 rounded-xl border bg-white p-4 shadow-sm sm:p-5">
+              <div className="mb-4 flex flex-wrap items-center gap-2">
+                <span className="text-xs font-semibold text-gray-500">
+                  Call using:
+                </span>
+
+                <div className="inline-flex rounded-lg bg-gray-100 p-1">
+                  <button
+                    onClick={() => changeMode("phone")}
+                    className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold ${
+                      mode === "phone"
+                        ? "bg-white text-gray-900 shadow-sm"
+                        : "text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
+                    <Smartphone className="h-3.5 w-3.5" />
+                    Phone app (automatic)
+                  </button>
+
+                  <button
+                    onClick={() => changeMode("laptop")}
+                    className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold ${
+                      mode === "laptop"
+                        ? "bg-white text-gray-900 shadow-sm"
+                        : "text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
+                    <Laptop className="h-3.5 w-3.5" />
+                    Laptop (click to dial)
+                  </button>
+                </div>
+              </div>
+
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
 
                 <div className="flex items-center gap-3">
@@ -690,11 +1052,13 @@ export default function CallingQueuePage() {
                             : "bg-gray-400"
                       }`}
                     />
-                    {running
-                      ? "Running"
-                      : pausedByAnswer
-                        ? "Stopped: customer answered"
-                        : "Stopped"}
+                    {mode === "laptop"
+                      ? "Laptop mode"
+                      : running
+                        ? "Running"
+                        : pausedByAnswer
+                          ? "Stopped: customer answered"
+                          : "Stopped"}
                   </span>
 
                   <span className="text-xs text-gray-500">
@@ -703,7 +1067,13 @@ export default function CallingQueuePage() {
                   </span>
                 </div>
 
-                {running ? (
+                {mode === "laptop" ? (
+                  <p className="max-w-sm text-xs text-gray-500">
+                    Laptop mode: the phone app is not used. Click{" "}
+                    <span className="font-semibold">Call from laptop</span> for
+                    each customer below.
+                  </p>
+                ) : running ? (
                   <button
                     onClick={stopQueue}
                     disabled={busy === "stop"}
@@ -757,10 +1127,25 @@ export default function CallingQueuePage() {
             <div className="mb-5">
               {currentCall ? (
                 <div className="overflow-hidden rounded-xl border-2 border-sky-300 bg-white shadow-sm">
-                  <div className="flex items-center gap-2 bg-sky-50 px-4 py-2.5 text-sm font-bold text-sky-700">
-                    <PhoneCall className="h-4 w-4 animate-pulse" />
-                    Calling now · attempt {Number(currentCall.call_attempts || 1)}{" "}
-                    of {maxAttempts}
+                  <div className="flex items-center justify-between gap-2 bg-sky-50 px-4 py-2.5 text-sm font-bold text-sky-700">
+                    <span className="inline-flex items-center gap-2">
+                      <PhoneCall className="h-4 w-4 animate-pulse" />
+                      Calling now · attempt{" "}
+                      {Number(currentCall.call_attempts || 1)} of {maxAttempts}
+                      {isConfirmed(currentCall) && (
+                        <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                          Confirmed order
+                        </span>
+                      )}
+                    </span>
+
+                    <button
+                      onClick={() => setEditingOrder({ ...currentCall })}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 bg-white px-3 py-1.5 text-xs font-bold text-sky-700 hover:bg-sky-100"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      Edit order
+                    </button>
                   </div>
 
                   <div className="grid gap-4 p-4 sm:p-5 lg:grid-cols-3">
@@ -801,7 +1186,123 @@ export default function CallingQueuePage() {
                       </p>
                     </div>
                   </div>
+
+                  {mode === "laptop" && (
+                    <div className="flex flex-wrap items-center gap-2 border-t bg-gray-50 px-4 py-3">
+                      <span className="text-xs font-semibold text-gray-500">
+                        How did the call go?
+                      </span>
+
+                      <button
+                        onClick={() => finishLaptopCall(currentCall, "answered")}
+                        disabled={busy === `finish-${currentCall.id}`}
+                        className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                      >
+                        Answered
+                      </button>
+
+                      <button
+                        onClick={() => finishLaptopCall(currentCall, "no_answer")}
+                        disabled={busy === `finish-${currentCall.id}`}
+                        className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-bold text-amber-700 hover:bg-amber-50 disabled:opacity-50"
+                      >
+                        No answer
+                      </button>
+
+                      <button
+                        onClick={() => finishLaptopCall(currentCall, "callback")}
+                        disabled={busy === `finish-${currentCall.id}`}
+                        className="rounded-lg border border-violet-300 bg-white px-3 py-2 text-xs font-bold text-violet-700 hover:bg-violet-50 disabled:opacity-50"
+                      >
+                        Call back in 30 min
+                      </button>
+
+                      <button
+                        onClick={() => finishLaptopCall(currentCall, "failed")}
+                        disabled={busy === `finish-${currentCall.id}`}
+                        className="rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 disabled:opacity-50"
+                      >
+                        Wrong number
+                      </button>
+
+                      <a
+                        href={`tel:${toDialNumber(currentCall.phone)}`}
+                        className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-bold text-gray-700 hover:bg-gray-100"
+                      >
+                        <Phone className="h-3.5 w-3.5" />
+                        Dial again
+                      </a>
+                    </div>
+                  )}
                 </div>
+              ) : mode === "laptop" ? (
+                nextDue ? (
+                  <div className="rounded-xl border-2 border-orange-300 bg-white p-4 shadow-sm sm:p-5">
+                    <p className="text-xs font-bold uppercase text-orange-600">
+                      Next customer
+                    </p>
+
+                    <div className="mt-2 grid gap-4 lg:grid-cols-3">
+                      <div>
+                        <p className="text-xl font-black text-gray-900">
+                          {nextDue.name}
+                        </p>
+
+                        <p className="mt-1 text-lg font-bold text-blue-700">
+                          {nextDue.phone}
+                        </p>
+
+                        <p className="mt-2 text-sm text-gray-600">
+                          {nextDue.address},{" "}
+                          <span className="font-semibold">{nextDue.city}</span>
+                        </p>
+                      </div>
+
+                      <div className="lg:col-span-2">
+                        <p className="rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-800">
+                          {itemsSummary(nextDue)}
+                        </p>
+
+                        <p className="mt-2 text-sm text-gray-500">
+                          Cash on delivery:{" "}
+                          <span className="text-lg font-black text-gray-900">
+                            Rs. {formatPrice(nextDue.total)}
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap items-center gap-2">
+                      <a
+                        href={`tel:${toDialNumber(nextDue.phone)}`}
+                        onClick={() => laptopDialStarted(nextDue)}
+                        className="inline-flex items-center gap-2 rounded-lg bg-orange-500 px-5 py-3 text-sm font-bold text-white hover:bg-orange-600"
+                      >
+                        <Phone className="h-4 w-4" />
+                        Call from laptop
+                      </a>
+
+                      <button
+                        onClick={() => setEditingOrder({ ...nextDue })}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-3 text-xs font-bold text-gray-700 hover:bg-gray-100"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        Edit order
+                      </button>
+                    </div>
+
+                    <p className="mt-3 text-xs text-gray-500">
+                      This opens your computer&apos;s calling app (for example
+                      Phone Link), which dials through your phone. After the
+                      call, press how it went.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-gray-300 bg-white p-5 text-center text-sm text-gray-500">
+                    No one is due for a call right now. Add orders to the queue
+                    below.
+                  </div>
+                )
               ) : (
                 <div className="rounded-xl border border-dashed border-gray-300 bg-white p-5 text-center text-sm text-gray-500">
                   {running
@@ -854,14 +1355,25 @@ export default function CallingQueuePage() {
                       </p>
 
                       <div className="mt-3 flex flex-wrap gap-1.5">
-                        <button
-                          onClick={() => confirmAnswered(order)}
-                          disabled={busy === `confirm-${order.id}`}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
-                        >
-                          <CheckCircle2 className="h-3.5 w-3.5" />
-                          Confirm order
-                        </button>
+                        {isConfirmed(order) ? (
+                          <button
+                            onClick={() => markDone(order)}
+                            disabled={busy === `done-${order.id}`}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            Done
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => confirmAnswered(order)}
+                            disabled={busy === `confirm-${order.id}`}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            Confirm order
+                          </button>
+                        )}
 
                         <button
                           onClick={() => callBackLater(order)}
@@ -873,10 +1385,19 @@ export default function CallingQueuePage() {
                         </button>
 
                         <button
+                          onClick={() => setEditingOrder({ ...order })}
+                          title="Edit order"
+                          className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs font-bold text-gray-700 hover:bg-gray-100"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                          Edit
+                        </button>
+
+                        <button
                           onClick={() => cancelAnswered(order)}
                           disabled={busy === `cancel-${order.id}`}
                           title="Cancel order"
-                          className="ml-auto rounded-lg border border-red-200 p-2 text-red-600 hover:bg-red-50 disabled:opacity-50"
+                          className="rounded-lg border border-red-200 p-2 text-red-600 hover:bg-red-50 disabled:opacity-50"
                         >
                           <Ban className="h-3.5 w-3.5" />
                         </button>
@@ -908,7 +1429,7 @@ export default function CallingQueuePage() {
                     [
                       ["available", "Not in queue"],
                       ["queued", "In queue"],
-                      ["all", "All pending"],
+                      ["all", "All orders"],
                     ] as [ListFilter, string][]
                   ).map(([value, label]) => (
                     <button
@@ -941,6 +1462,18 @@ export default function CallingQueuePage() {
                   {selected.size} selected
                 </span>
 
+                <select
+                  value={typeFilter}
+                  onChange={(e) =>
+                    setTypeFilter(e.target.value as OrderTypeFilter)
+                  }
+                  className="h-8 rounded-lg border border-gray-200 bg-white px-2 text-xs font-semibold text-gray-700 outline-none"
+                >
+                  <option value="all">Pending + Confirmed</option>
+                  <option value="pending">Pending only</option>
+                  <option value="confirmed">Confirmed only</option>
+                </select>
+
                 <div className="ml-auto flex flex-wrap gap-2">
                   <button
                     onClick={() => addToQueue(Array.from(selected), "selected")}
@@ -954,15 +1487,29 @@ export default function CallingQueuePage() {
                   <button
                     onClick={() =>
                       addToQueue(
-                        notInQueue.map((order) => order.id),
+                        notInQueuePending.map((order) => order.id),
                         "all pending"
                       )
                     }
-                    disabled={notInQueue.length === 0 || busy === "add"}
+                    disabled={notInQueuePending.length === 0 || busy === "add"}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-orange-300 px-3 py-2 text-xs font-bold text-orange-700 hover:bg-orange-50 disabled:opacity-40"
                   >
                     <Plus className="h-3.5 w-3.5" />
-                    Add all pending ({notInQueue.length})
+                    Add all pending ({notInQueuePending.length})
+                  </button>
+
+                  <button
+                    onClick={() =>
+                      addToQueue(
+                        notInQueueConfirmed.map((order) => order.id),
+                        "all confirmed"
+                      )
+                    }
+                    disabled={notInQueueConfirmed.length === 0 || busy === "add"}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-50 disabled:opacity-40"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Add all confirmed ({notInQueueConfirmed.length})
                   </button>
 
                   <button
@@ -1024,6 +1571,12 @@ export default function CallingQueuePage() {
                           </span>
 
                           <div className="flex items-center gap-1.5">
+                            {isConfirmed(order) && (
+                              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                                Confirmed
+                              </span>
+                            )}
+
                             {order.in_call_queue && (
                               <span className="rounded-full border border-orange-200 bg-orange-50 px-2 py-0.5 text-[11px] font-semibold text-orange-700">
                                 In queue
@@ -1182,6 +1735,292 @@ export default function CallingQueuePage() {
           </>
         )}
       </div>
+
+      {/* EDIT ORDER MODAL (opens from the Calling now card and answered cards) */}
+
+      {editingOrder && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-3">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-2xl">
+
+            <div className="flex items-center justify-between border-b px-5 py-4">
+              <div>
+                <h2 className="font-bold">Edit Order</h2>
+
+                <p className="text-xs text-gray-400">
+                  Changes are saved to the order. The call is not affected.
+                </p>
+              </div>
+
+              <button
+                onClick={() => setEditingOrder(null)}
+                className="rounded-lg p-2 hover:bg-gray-100"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 p-5">
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-gray-600">
+                  Customer Name
+                </label>
+                <input
+                  value={editingOrder.name || ""}
+                  onChange={(e) =>
+                    setEditingOrder({ ...editingOrder, name: e.target.value })
+                  }
+                  className="h-10 w-full rounded-lg border px-3 text-sm outline-none focus:border-orange-400"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-gray-600">
+                  Phone
+                </label>
+                <input
+                  value={editingOrder.phone || ""}
+                  onChange={(e) =>
+                    setEditingOrder({ ...editingOrder, phone: e.target.value })
+                  }
+                  className="h-10 w-full rounded-lg border px-3 text-sm outline-none focus:border-orange-400"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-gray-600">
+                  Email
+                </label>
+                <input
+                  value={editingOrder.email || ""}
+                  onChange={(e) =>
+                    setEditingOrder({ ...editingOrder, email: e.target.value })
+                  }
+                  className="h-10 w-full rounded-lg border px-3 text-sm outline-none focus:border-orange-400"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-gray-600">
+                  City
+                </label>
+                <input
+                  value={editingOrder.city || ""}
+                  onChange={(e) =>
+                    setEditingOrder({ ...editingOrder, city: e.target.value })
+                  }
+                  className="h-10 w-full rounded-lg border px-3 text-sm outline-none focus:border-orange-400"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-gray-600">
+                  Address
+                </label>
+                <textarea
+                  value={editingOrder.address || ""}
+                  onChange={(e) =>
+                    setEditingOrder({ ...editingOrder, address: e.target.value })
+                  }
+                  rows={4}
+                  className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-orange-400"
+                />
+              </div>
+
+              <div>
+                <div className="mb-1 flex items-center justify-between">
+                  <label className="block text-xs font-semibold text-gray-600">
+                    Total
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setEditingOrder({
+                        ...editingOrder,
+                        total: itemsTotal(editingOrder.items || []),
+                      })
+                    }
+                    className="text-[11px] font-semibold text-orange-600 hover:underline"
+                  >
+                    Use products total (Rs. {formatPrice(itemsTotal(editingOrder.items || []))})
+                  </button>
+                </div>
+
+                <input
+                  type="number"
+                  value={editingOrder.total}
+                  onChange={(e) =>
+                    setEditingOrder({
+                      ...editingOrder,
+                      total: Number(e.target.value),
+                    })
+                  }
+                  className="h-10 w-full rounded-lg border px-3 text-sm outline-none focus:border-orange-400"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-gray-600">
+                  Bike Specifications
+                </label>
+                <input
+                  value={editingOrder.bike_specifications || ""}
+                  onChange={(e) =>
+                    setEditingOrder({
+                      ...editingOrder,
+                      bike_specifications: e.target.value,
+                    })
+                  }
+                  placeholder="70cc, 125cc..."
+                  className="h-10 w-full rounded-lg border px-3 text-sm outline-none focus:border-orange-400"
+                />
+              </div>
+
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <label className="block text-xs font-semibold text-gray-600">
+                    Products
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={addEditingItem}
+                    className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-100"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Add product
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {(editingOrder.items || []).length === 0 && (
+                    <p className="rounded-lg border border-dashed border-gray-200 p-3 text-center text-xs text-gray-400">
+                      No products on this order yet.
+                    </p>
+                  )}
+
+                  {(editingOrder.items || []).map((item, index) => (
+                    <div
+                      key={item.id || index}
+                      className="space-y-2 rounded-lg border border-gray-200 bg-gray-50 p-3"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <input
+                          value={item.name || ""}
+                          onChange={(e) =>
+                            updateEditingItem(index, "name", e.target.value)
+                          }
+                          placeholder="Product name"
+                          className="h-9 w-full rounded-lg border bg-white px-3 text-sm font-medium outline-none focus:border-orange-400"
+                        />
+
+                        <button
+                          type="button"
+                          onClick={() => removeEditingItem(index)}
+                          title="Remove this product"
+                          className="shrink-0 rounded-lg border border-red-200 p-2 text-red-600 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        <div>
+                          <label className="mb-1 block text-[11px] font-semibold text-gray-500">
+                            Price
+                          </label>
+                          <input
+                            type="number"
+                            value={item.price ?? 0}
+                            onChange={(e) =>
+                              updateEditingItem(
+                                index,
+                                "price",
+                                Number(e.target.value)
+                              )
+                            }
+                            className="h-9 w-full rounded-lg border bg-white px-2 text-sm outline-none focus:border-orange-400"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="mb-1 block text-[11px] font-semibold text-gray-500">
+                            Quantity
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            value={item.quantity ?? 1}
+                            onChange={(e) =>
+                              updateEditingItem(
+                                index,
+                                "quantity",
+                                Number(e.target.value)
+                              )
+                            }
+                            className="h-9 w-full rounded-lg border bg-white px-2 text-sm outline-none focus:border-orange-400"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="mb-1 block text-[11px] font-semibold text-gray-500">
+                            Color
+                          </label>
+                          <input
+                            value={item.color || ""}
+                            onChange={(e) =>
+                              updateEditingItem(index, "color", e.target.value)
+                            }
+                            placeholder="e.g. Red"
+                            className="h-9 w-full rounded-lg border bg-white px-2 text-sm outline-none focus:border-orange-400"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="mb-1 block text-[11px] font-semibold text-gray-500">
+                            Size
+                          </label>
+                          <input
+                            value={item.size || ""}
+                            onChange={(e) =>
+                              updateEditingItem(index, "size", e.target.value)
+                            }
+                            placeholder="e.g. L"
+                            className="h-9 w-full rounded-lg border bg-white px-2 text-sm outline-none focus:border-orange-400"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-2 border-t bg-gray-50 px-5 py-4">
+              <button
+                onClick={() => setEditingOrder(null)}
+                className="flex-1 rounded-lg border bg-white px-4 py-2.5 text-sm font-semibold"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={saveEdit}
+                disabled={busy === `edit-${editingOrder.id}`}
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                {busy === `edit-${editingOrder.id}` ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
