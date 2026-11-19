@@ -226,6 +226,19 @@ export default function CallingQueuePage() {
   const [editingOrder, setEditingOrder] = useState<QueueOrder | null>(null)
 
   const [mode, setMode] = useState<CallMode>("phone")
+  const [now, setNow] = useState(0)
+
+  // Keep the current time in state so memoized values stay fresh without
+  // calling Date.now() during render.
+  useEffect(() => {
+    setNow(Date.now())
+
+    const timer = setInterval(() => {
+      setNow(Date.now())
+    }, POLL_MS)
+
+    return () => clearInterval(timer)
+  }, [])
 
   useEffect(() => {
     try {
@@ -392,8 +405,6 @@ export default function CallingQueuePage() {
 
   // Laptop mode: the customer who is due next (same order the phone app would use).
   const nextDue = useMemo(() => {
-    const now = Date.now()
-
     const due = waitingToCall.filter(
       (order) =>
         !order.next_call_at || new Date(order.next_call_at).getTime() <= now
@@ -413,7 +424,7 @@ export default function CallingQueuePage() {
     })
 
     return due[0]
-  }, [waitingToCall])
+  }, [waitingToCall, now])
 
   const visibleOrders = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -1007,11 +1018,10 @@ export default function CallingQueuePage() {
                 <div className="inline-flex rounded-lg bg-gray-100 p-1">
                   <button
                     onClick={() => changeMode("phone")}
-                    className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold ${
-                      mode === "phone"
+                    className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold ${mode === "phone"
                         ? "bg-white text-gray-900 shadow-sm"
                         : "text-gray-500 hover:text-gray-700"
-                    }`}
+                      }`}
                   >
                     <Smartphone className="h-3.5 w-3.5" />
                     Phone app (automatic)
@@ -1019,11 +1029,10 @@ export default function CallingQueuePage() {
 
                   <button
                     onClick={() => changeMode("laptop")}
-                    className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold ${
-                      mode === "laptop"
+                    className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold ${mode === "laptop"
                         ? "bg-white text-gray-900 shadow-sm"
                         : "text-gray-500 hover:text-gray-700"
-                    }`}
+                      }`}
                   >
                     <Laptop className="h-3.5 w-3.5" />
                     Laptop (click to dial)
@@ -1035,22 +1044,20 @@ export default function CallingQueuePage() {
 
                 <div className="flex items-center gap-3">
                   <span
-                    className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-bold ${
-                      running
+                    className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-bold ${running
                         ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                         : pausedByAnswer
                           ? "border-amber-200 bg-amber-50 text-amber-700"
                           : "border-gray-200 bg-gray-100 text-gray-600"
-                    }`}
+                      }`}
                   >
                     <span
-                      className={`h-2.5 w-2.5 rounded-full ${
-                        running
+                      className={`h-2.5 w-2.5 rounded-full ${running
                           ? "animate-pulse bg-emerald-500"
                           : pausedByAnswer
                             ? "bg-amber-500"
                             : "bg-gray-400"
-                      }`}
+                        }`}
                     />
                     {mode === "laptop"
                       ? "Laptop mode"
@@ -1435,11 +1442,10 @@ export default function CallingQueuePage() {
                     <button
                       key={value}
                       onClick={() => setListFilter(value)}
-                      className={`whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium ${
-                        listFilter === value
+                      className={`whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium ${listFilter === value
                           ? "bg-gray-900 text-white"
                           : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                      }`}
+                        }`}
                     >
                       {label}
                     </button>
@@ -1642,9 +1648,8 @@ export default function CallingQueuePage() {
                         </span>
 
                         <span
-                          className={`ml-auto text-xs font-bold uppercase ${
-                            OUTCOME_CLASSES[attempt.outcome] || "text-gray-600"
-                          }`}
+                          className={`ml-auto text-xs font-bold uppercase ${OUTCOME_CLASSES[attempt.outcome] || "text-gray-600"
+                            }`}
                         >
                           {attempt.outcome.replace("_", " ")}
                           {attempt.talk_seconds > 0
@@ -1964,10 +1969,15 @@ export default function CallingQueuePage() {
                         </div>
 
                         <div>
-                          <label className="mb-1 block text-[11px] font-semibold text-gray-500">
+                          <label
+                            htmlFor={`color-${index}`}
+                            className="mb-1 block text-[11px] font-semibold text-gray-500"
+                          >
                             Color
                           </label>
+
                           <input
+                            id={`color-${index}`}
                             value={item.color || ""}
                             onChange={(e) =>
                               updateEditingItem(index, "color", e.target.value)
