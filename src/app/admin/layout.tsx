@@ -10,6 +10,7 @@ import {
   FaDollarSign,
   FaChartBar,
   FaSignOutAlt,
+  FaPhoneAlt,
 } from "react-icons/fa"
 import { Button } from "@/components/ui/button"
 import CourierProviderSelector from "@/components/admin/CourierProviderSelector"
@@ -21,6 +22,7 @@ const menuItems = [
   { name: "Create Order", href: "/admin/create", icon: <FaPlus /> },
 
   { name: "Finance", href: "/admin/finance", icon: <FaDollarSign /> },
+  { name: "Calling", href: "/admin/calling", icon: <FaPhoneAlt /> },
   
 ]
 
