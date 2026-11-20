@@ -28,6 +28,7 @@ import {
   Trash2,
   Laptop,
   Smartphone,
+  Truck,
 } from "lucide-react"
 
 type CallStatus =
@@ -45,6 +46,7 @@ type OrderItem = {
   quantity?: number
   color?: string | null
   size?: string | null
+  category?: string | null
 }
 
 type QueueOrder = {
@@ -57,6 +59,8 @@ type QueueOrder = {
   items: OrderItem[]
   total: number
   bike_specifications?: string | null
+  courier_provider?: string | null
+  tracking_number?: string | null
   order_status?: string | null
   dispatched: boolean
   created_at: string
@@ -114,9 +118,6 @@ function toDialNumber(phone: string) {
 
 const POLL_MS = 4000
 
-const ORDER_COLUMNS =
-  "id,name,phone,email,city,address,items,total,bike_specifications,order_status,dispatched,created_at,in_call_queue,call_status,call_attempts,last_call_at,next_call_at"
-
 const STATUS_STYLES: Record<CallStatus, { label: string; classes: string }> = {
   not_called: {
     label: "Not called",
@@ -159,6 +160,56 @@ function callStatusOf(order: QueueOrder): CallStatus {
 
 function isConfirmed(order: QueueOrder) {
   return order.order_status === "confirmed"
+}
+
+// ---- Booking helpers (same rules as the Dispatch Board) ----
+
+const RAIN_CATEGORIES = ["rain suit", "rain coat"]
+
+function isRainCategoryOrder(order: QueueOrder) {
+  return order.items?.some((item) => {
+    const category = String(item.category || "").toLowerCase()
+    const name = String(item.name || "").toLowerCase()
+
+    return RAIN_CATEGORIES.some(
+      (rainCategory) =>
+        category.includes(rainCategory) || name.includes(rainCategory)
+    )
+  })
+}
+
+// Product text sent to the courier, e.g. "Helmet - x1 - Black 70cc"
+function bookingDetails(order: QueueOrder) {
+  if (!order.items?.length) {
+    return "Order"
+  }
+
+  const bikeSpecs = (order.bike_specifications || "").trim()
+
+  return order.items
+    .map((item) => {
+      const color = item.color ? capitalize(String(item.color)) : ""
+
+      const colorAndBike = bikeSpecs
+        ? [color, bikeSpecs].filter(Boolean).join(" ")
+        : color
+          ? `Color: ${color}`
+          : ""
+
+      const parts = [
+        item.name || "Product",
+        item.quantity ? `x${item.quantity}` : "",
+        colorAndBike,
+        item.size ? `Size: ${item.size}` : "",
+      ].filter(Boolean)
+
+      return parts.join(" - ")
+    })
+    .join(", ")
+}
+
+function bookLabel(order: QueueOrder) {
+  return isConfirmed(order) ? "Book shipment" : "Confirm & Book"
 }
 
 function itemsTotal(items: OrderItem[]) {
@@ -226,19 +277,6 @@ export default function CallingQueuePage() {
   const [editingOrder, setEditingOrder] = useState<QueueOrder | null>(null)
 
   const [mode, setMode] = useState<CallMode>("phone")
-  const [now, setNow] = useState(0)
-
-  // Keep the current time in state so memoized values stay fresh without
-  // calling Date.now() during render.
-  useEffect(() => {
-    setNow(Date.now())
-
-    const timer = setInterval(() => {
-      setNow(Date.now())
-    }, POLL_MS)
-
-    return () => clearInterval(timer)
-  }, [])
 
   useEffect(() => {
     try {
@@ -278,7 +316,7 @@ export default function CallingQueuePage() {
       const [ordersRes, stateRes, attemptsRes] = await Promise.all([
         supabaseClient
           .from("orders")
-          .select(ORDER_COLUMNS)
+          .select("*")
           .eq("dispatched", false)
           .or(
             "order_status.eq.pending,order_status.eq.confirmed,order_status.is.null"
@@ -405,6 +443,8 @@ export default function CallingQueuePage() {
 
   // Laptop mode: the customer who is due next (same order the phone app would use).
   const nextDue = useMemo(() => {
+    const now = Date.now()
+
     const due = waitingToCall.filter(
       (order) =>
         !order.next_call_at || new Date(order.next_call_at).getTime() <= now
@@ -424,7 +464,7 @@ export default function CallingQueuePage() {
     })
 
     return due[0]
-  }, [waitingToCall, now])
+  }, [waitingToCall])
 
   const visibleOrders = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -628,6 +668,195 @@ export default function CallingQueuePage() {
       }
 
       return "Queue stopped. A call already in progress will finish."
+    })
+  }
+
+  /*
+   * CONFIRM + BOOK SHIPMENT
+   *
+   * Books the courier right after the call, using the same courier routes,
+   * rules and WhatsApp dispatch message as the Dispatch Board.
+   */
+
+  function bookOrder(order: QueueOrder) {
+    if (order.dispatched) {
+      showError("This order has already been booked.")
+      return
+    }
+
+    if (order.order_status === "cancelled") {
+      showError("Cancelled orders cannot be booked.")
+      return
+    }
+
+    const proceed = window.confirm(
+      `${isConfirmed(order) ? "Book shipment" : "Confirm and book shipment"} for ${order.name}?\n\n` +
+        `${order.address}, ${order.city}\n` +
+        `Cash on delivery: Rs. ${formatPrice(order.total)}\n\n` +
+        `This sends the order to the courier.`
+    )
+
+    if (!proceed) {
+      return
+    }
+
+    runAction(`book-${order.id}`, async () => {
+      // 1) Confirm first if the customer has just agreed on the call
+      if (!isConfirmed(order)) {
+        const { error: confirmError } = await supabaseClient
+          .from("orders")
+          .update({ order_status: "confirmed" })
+          .eq("id", order.id)
+
+        if (confirmError) {
+          throw confirmError
+        }
+      }
+
+      // 2) Courier rules: Rain Suit / Rain Coat always PostEx + KHAN_ZAIB
+      const isRainOrder = isRainCategoryOrder(order)
+
+      const effectiveProvider = isRainOrder
+        ? "postex"
+        : order.courier_provider || "postex"
+
+      const totalItems =
+        order.items?.reduce(
+          (sum, item) => sum + Number(item.quantity || 1),
+          0
+        ) || 1
+
+      const payload: Record<string, any> = {
+        orderId: order.id,
+        orderRefNumber: `BIN-${String(order.id).slice(0, 8).toUpperCase()}`,
+        invoicePayment: String(order.total),
+        orderDetail: bookingDetails(order),
+        customerName: order.name,
+        customerPhone: order.phone,
+        deliveryAddress: order.address,
+        transactionNotes: "Allowed To Open",
+        cityName: order.city,
+        invoiceDivision: 1,
+        items: totalItems,
+        weight: Math.max(totalItems * 0.3, 0.5),
+        orderType: "Normal",
+        pickupAddressCode: "001",
+        pickupAddress: "House # 44 5/f1 Orangi Town Karachi",
+      }
+
+      if (isRainOrder) {
+        payload.accountKey = "KHAN_ZAIB"
+      }
+
+      const endpoint =
+        effectiveProvider === "nextstep"
+          ? "/api/nextstep/create"
+          : "/api/postex/create"
+
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(
+          result?.statusMessage ||
+            result?.message ||
+            "Courier booking failed. The order is confirmed but not booked."
+        )
+      }
+
+      const dist = result?.dist || {}
+
+      const trackingNumber =
+        dist?.trackingNumber ||
+        dist?.tracking_number ||
+        dist?.trackingNo ||
+        dist?.order?.trackingNumber ||
+        dist?.order?.tracking_number ||
+        result?.trackingNumber ||
+        result?.tracking_number ||
+        null
+
+      // 3) Save the booking on the order (and take it out of the calling queue)
+      let { error: updateError } = await supabaseClient
+        .from("orders")
+        .update({
+          dispatched: true,
+          order_status: "confirmed",
+          tracking_number: trackingNumber,
+          courier_provider: effectiveProvider,
+          in_call_queue: false,
+        })
+        .eq("id", order.id)
+
+      // Same compatibility fallback as the Dispatch Board
+      if (
+        updateError &&
+        updateError.message?.toLowerCase().includes("courier_provider")
+      ) {
+        const fallback = await supabaseClient
+          .from("orders")
+          .update({
+            dispatched: true,
+            order_status: "confirmed",
+            tracking_number: trackingNumber,
+            in_call_queue: false,
+          })
+          .eq("id", order.id)
+
+        updateError = fallback.error
+      }
+
+      if (updateError) {
+        throw new Error(
+          `The courier booked this order${trackingNumber ? ` (tracking ${trackingNumber})` : ""}, but saving it failed: ${updateError.message}. Do not book it again; update it on the Dispatch Board.`
+        )
+      }
+
+      // Close any call that is still open for this order
+      await supabaseClient
+        .from("call_attempts")
+        .update({ outcome: "answered", ended_at: new Date().toISOString() })
+        .eq("order_id", String(order.id))
+        .eq("outcome", "calling")
+
+      setEditingOrder(null)
+
+      // 4) Dispatch WhatsApp message (a failure here never undoes the booking)
+      if (!trackingNumber) {
+        return "Shipment booked, but no tracking number was returned. WhatsApp was not sent."
+      }
+
+      try {
+        const trackingLink =
+          effectiveProvider === "nextstep"
+            ? "https://nextstepcourier.com/"
+            : "https://postex.pk/tracking"
+
+        const whatsappResponse = await fetch("/api/whatsapp/dispatch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            phone: order.phone,
+            orderId: order.id,
+            trackingNumber,
+            courier: effectiveProvider === "nextstep" ? "NextStep" : "PostEx",
+            trackingLink,
+          }),
+        })
+
+        if (!whatsappResponse.ok) {
+          return `Shipment booked. Tracking: ${trackingNumber}. WhatsApp notification failed.`
+        }
+
+        return `Shipment booked and WhatsApp sent. Tracking: ${trackingNumber}`
+      } catch {
+        return `Shipment booked. Tracking: ${trackingNumber}. WhatsApp notification could not be sent.`
+      }
     })
   }
 
@@ -1018,10 +1247,11 @@ export default function CallingQueuePage() {
                 <div className="inline-flex rounded-lg bg-gray-100 p-1">
                   <button
                     onClick={() => changeMode("phone")}
-                    className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold ${mode === "phone"
+                    className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold ${
+                      mode === "phone"
                         ? "bg-white text-gray-900 shadow-sm"
                         : "text-gray-500 hover:text-gray-700"
-                      }`}
+                    }`}
                   >
                     <Smartphone className="h-3.5 w-3.5" />
                     Phone app (automatic)
@@ -1029,10 +1259,11 @@ export default function CallingQueuePage() {
 
                   <button
                     onClick={() => changeMode("laptop")}
-                    className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold ${mode === "laptop"
+                    className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold ${
+                      mode === "laptop"
                         ? "bg-white text-gray-900 shadow-sm"
                         : "text-gray-500 hover:text-gray-700"
-                      }`}
+                    }`}
                   >
                     <Laptop className="h-3.5 w-3.5" />
                     Laptop (click to dial)
@@ -1044,20 +1275,22 @@ export default function CallingQueuePage() {
 
                 <div className="flex items-center gap-3">
                   <span
-                    className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-bold ${running
+                    className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-bold ${
+                      running
                         ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                         : pausedByAnswer
                           ? "border-amber-200 bg-amber-50 text-amber-700"
                           : "border-gray-200 bg-gray-100 text-gray-600"
-                      }`}
+                    }`}
                   >
                     <span
-                      className={`h-2.5 w-2.5 rounded-full ${running
+                      className={`h-2.5 w-2.5 rounded-full ${
+                        running
                           ? "animate-pulse bg-emerald-500"
                           : pausedByAnswer
                             ? "bg-amber-500"
                             : "bg-gray-400"
-                        }`}
+                      }`}
                     />
                     {mode === "laptop"
                       ? "Laptop mode"
@@ -1146,13 +1379,28 @@ export default function CallingQueuePage() {
                       )}
                     </span>
 
-                    <button
-                      onClick={() => setEditingOrder({ ...currentCall })}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 bg-white px-3 py-1.5 text-xs font-bold text-sky-700 hover:bg-sky-100"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                      Edit order
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setEditingOrder({ ...currentCall })}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 bg-white px-3 py-1.5 text-xs font-bold text-sky-700 hover:bg-sky-100"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        Edit order
+                      </button>
+
+                      <button
+                        onClick={() => bookOrder(currentCall)}
+                        disabled={busy === `book-${currentCall.id}`}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-orange-600 disabled:opacity-50"
+                      >
+                        {busy === `book-${currentCall.id}` ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Truck className="h-3.5 w-3.5" />
+                        )}
+                        {bookLabel(currentCall)}
+                      </button>
+                    </div>
                   </div>
 
                   <div className="grid gap-4 p-4 sm:p-5 lg:grid-cols-3">
@@ -1392,6 +1640,20 @@ export default function CallingQueuePage() {
                         </button>
 
                         <button
+                          onClick={() => bookOrder(order)}
+                          disabled={busy === `book-${order.id}`}
+                          title="Send this order to the courier"
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-orange-500 px-3 py-2 text-xs font-bold text-white hover:bg-orange-600 disabled:opacity-50"
+                        >
+                          {busy === `book-${order.id}` ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Truck className="h-3.5 w-3.5" />
+                          )}
+                          {bookLabel(order)}
+                        </button>
+
+                        <button
                           onClick={() => setEditingOrder({ ...order })}
                           title="Edit order"
                           className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs font-bold text-gray-700 hover:bg-gray-100"
@@ -1442,10 +1704,11 @@ export default function CallingQueuePage() {
                     <button
                       key={value}
                       onClick={() => setListFilter(value)}
-                      className={`whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium ${listFilter === value
+                      className={`whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium ${
+                        listFilter === value
                           ? "bg-gray-900 text-white"
                           : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                        }`}
+                      }`}
                     >
                       {label}
                     </button>
@@ -1648,8 +1911,9 @@ export default function CallingQueuePage() {
                         </span>
 
                         <span
-                          className={`ml-auto text-xs font-bold uppercase ${OUTCOME_CLASSES[attempt.outcome] || "text-gray-600"
-                            }`}
+                          className={`ml-auto text-xs font-bold uppercase ${
+                            OUTCOME_CLASSES[attempt.outcome] || "text-gray-600"
+                          }`}
                         >
                           {attempt.outcome.replace("_", " ")}
                           {attempt.talk_seconds > 0
@@ -1969,15 +2233,10 @@ export default function CallingQueuePage() {
                         </div>
 
                         <div>
-                          <label
-                            htmlFor={`color-${index}`}
-                            className="mb-1 block text-[11px] font-semibold text-gray-500"
-                          >
+                          <label className="mb-1 block text-[11px] font-semibold text-gray-500">
                             Color
                           </label>
-
                           <input
-                            id={`color-${index}`}
                             value={item.color || ""}
                             onChange={(e) =>
                               updateEditingItem(index, "color", e.target.value)
