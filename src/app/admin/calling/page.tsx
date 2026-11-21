@@ -276,16 +276,31 @@ export default function CallingQueuePage() {
   const [typeFilter, setTypeFilter] = useState<OrderTypeFilter>("all")
   const [editingOrder, setEditingOrder] = useState<QueueOrder | null>(null)
 
-  const [mode, setMode] = useState<CallMode>("phone")
-
-  useEffect(() => {
+  // Remembered per browser. The page shows a loading screen first, so reading
+  // storage here cannot cause a mismatch with the server-rendered page.
+  const [mode, setMode] = useState<CallMode>(() => {
     try {
-      if (window.localStorage.getItem("calling_mode") === "laptop") {
-        setMode("laptop")
+      if (
+        typeof window !== "undefined" &&
+        window.localStorage.getItem("calling_mode") === "laptop"
+      ) {
+        return "laptop"
       }
     } catch {
       // browser storage not available
     }
+
+    return "phone"
+  })
+
+  // Current time, refreshed every few seconds. Kept in state so that render
+  // stays pure (calling Date.now() while rendering breaks the build lint rule).
+  const [now, setNow] = useState(() => Date.now())
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 5000)
+
+    return () => clearInterval(timer)
   }, [])
 
   const [message, setMessage] = useState("")
@@ -443,8 +458,6 @@ export default function CallingQueuePage() {
 
   // Laptop mode: the customer who is due next (same order the phone app would use).
   const nextDue = useMemo(() => {
-    const now = Date.now()
-
     const due = waitingToCall.filter(
       (order) =>
         !order.next_call_at || new Date(order.next_call_at).getTime() <= now
@@ -464,7 +477,7 @@ export default function CallingQueuePage() {
     })
 
     return due[0]
-  }, [waitingToCall])
+  }, [waitingToCall, now])
 
   const visibleOrders = useMemo(() => {
     const query = search.trim().toLowerCase()
