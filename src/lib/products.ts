@@ -16,9 +16,8 @@ export const Products: Product[] = [
       { name: "black", image: "/images/black-display.jpeg", default: true },
       { name: "green", image: "/images/green-display.jpeg" },
       { name: "blue", image: "/images/blue-display.jpeg" },
-      { name: "silver", image: "/images/silver-display.jpeg"},
-      { name: "darkBrown", image: "/images/brown-display.jpeg"},
-      { name: "gray", image: "/images/silver-display.jpeg"},
+        { name: "skin", image: "/images/skin.png"},
+        { name: "Army Green", image: "/images/armygreen.png"},
       { name: "red", image: "/images/mahroon-display.jpeg"}
     
     ]
@@ -38,10 +37,9 @@ export const Products: Product[] = [
       { name: "green", image: "/images/green-display.jpeg", default: true },
       { name: "black", image: "/images/black-display.jpeg" },
       { name: "blue", image: "/images/blue-display.jpeg" },
-      { name: "silver", image: "/images/silver-display.jpeg"},
-      { name: "darkBrown", image: "/images/brown-display.jpeg"},
+     { name: "Army Green", image: "/images/armygreen.png"},
       { name: "gray", image: "/images/silver-display.jpeg"},
-      { name: "red", image: "/images/mahroon-display.jpeg"}
+       { name: "skin", image: "/images/skin.png"},
     
     ]
   },
@@ -59,16 +57,14 @@ export const Products: Product[] = [
     colors: [
       { name: "blue", image: "/images/blue-display.jpeg", default: true },
       { name: "black", image: "/images/black-display.jpeg" },
-      { name: "green", image: "/images/green-display.jpeg" },
-      { name: "silver", image: "/images/silver-display.jpeg"},
-      { name: "darkBrown", image: "/images/brown-display.jpeg"},
-      { name: "gray", image: "/images/silver-display.jpeg"},
+        { name: "skin", image: "/images/skin.png"},
+      { name: "Army Green", image: "/images/armygreen.png"},
       { name: "red", image: "/images/mahroon-display.jpeg"}
     
     ]
   },
 
-    {
+    /*{
     id: "5",
     name: "Parachute Bike Cover",
     price: 1200 ,
@@ -88,7 +84,7 @@ export const Products: Product[] = [
       { name: "darkBrown", image: "/images/brown-display.jpeg"},
       { name: "red", image: "/images/mahroon-display.jpeg"}
     ]
-  },
+  },*/
    {
     id: "6",
     name: "Parachute Bike Cover",
@@ -105,13 +101,13 @@ export const Products: Product[] = [
       { name: "black", image: "/images/black-display.jpeg" },
       { name: "green", image: "/images/green-display.jpeg" },
       { name: "blue", image: "/images/blue-display.jpeg"},
-      { name: "silver", image: "/images/silver-display.jpeg"},
-      { name: "darkBrown", image: "/images/brown-display.jpeg"},
-      { name: "gray", image: "/images/silver-display.jpeg"}
+     { name: "skin", image: "/images/skin.png"},
+      { name: "Army Green", image: "/images/armygreen.png"},
+
 
     ]
   },
-   {
+   /*{
     id: "7",
     name: "Parachute Bike Cover",
     price: 1200 ,
@@ -150,12 +146,52 @@ export const Products: Product[] = [
       { name: "green", image: "/images/green-display.jpeg" },
       { name: "blue", image: "/images/blue-display.jpeg"},
       { name: "red", image: "/images/mahroon-display.jpeg"},
-      { name: "silver", image: "/images/silver-display.jpeg"},
-      { name: "gray", image: "/images/silver-display.jpeg"}
+      
+
+    ]
+  },*/
+  {
+    id: "P9",
+    name: "Parachute Bike Cover",
+    price: 1200 ,
+    image: "/images/skin.png",
+    category: "Parachute",
+    description: ` Free delivery
+ Open parcel allowed
+ 100% waterproof
+ 1-year warranty`,
+    quantity: 1,
+    colors: [
+      { name: "skin", image: "/images/skin.png", default: true },
+      { name: "black", image: "/images/black-display.jpeg" },
+      { name: "green", image: "/images/green-display.jpeg" },
+      { name: "blue", image: "/images/blue-display.jpeg"},
+      { name: "red", image: "/images/mahroon-display.jpeg"},
+      { name: "Army Green", image: "/images/armygreen.png"},
 
     ]
   },
+{
+    id: "P10",
+    name: "Parachute Bike Cover",
+    price: 1200 ,
+    image: "/images/armygreen.png",
+    category: "Parachute",
+    description: ` Free delivery
+ Open parcel allowed
+ 100% waterproof
+ 1-year warranty`,
+    quantity: 1,
+    colors: [
+      { name: "Army Green", image: "/images/armygreen.png", default: true },
+      { name: "black", image: "/images/black-display.jpeg" },
+      { name: "green", image: "/images/green-display.jpeg" },
+      { name: "blue", image: "/images/blue-display.jpeg"},
+      { name: "red", image: "/images/mahroon-display.jpeg"},
+      { name: "skin", image: "/images/skin.png"},
 
+    ]
+  },
 
 
 
@@ -568,7 +604,7 @@ Open parcel allowed
   {
     id: "R1",
     name: "Rain Suit",
-    price: 1500,
+    price: 1680,
     image: "/images/rain-suite-black2.png",
     category: "Rain Suites",
     description: `Free delivery
@@ -589,7 +625,7 @@ Available in Small, Medium, Large & Extra Large`,
   {
     id: "R2",
     name: "Rain Suit",
-    price: 1500,
+    price: 1680,
     image: "/images/rain-suite-blue2.png",
     category: "Rain Suites",
     description: `Free delivery
@@ -610,7 +646,7 @@ Available in Small, Medium, Large & Extra Large`,
   {
     id: "R3",
     name: "Rain Suit",
-    price: 1500,
+    price: 1680,
     image: "/images/rain-suite-mahroon.png",
     category: "Rain Suites",
     description: `Free delivery
@@ -633,7 +669,7 @@ Available in Small, Medium, Large & Extra Large`,
   {
     id: "R4",
     name: "Rain Suit",
-    price: 1500,
+    price: 1680,
     image: "/images/rain-suite-green.png",
     category: "Rain Suites",
     description: `Free delivery
@@ -660,7 +696,7 @@ Available in Small, Medium, Large & Extra Large`,
   {
     id: "R5",
     name: "Rain Suit",
-    price: 1500,
+    price: 1680,
     image: "/images/rain-suite-skyblue.png",
     category: "Rain Suites",
     description: `Free delivery
