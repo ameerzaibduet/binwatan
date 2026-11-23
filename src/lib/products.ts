@@ -14,6 +14,8 @@ export const Products: Product[] = [
     quantity: 1,
     colors: [
       { name: "black", image: "/images/black-display.jpeg", default: true },
+            { name: "gray", image: "/images/4pgray.png"},
+
       { name: "green", image: "/images/green-display.jpeg" },
       { name: "blue", image: "/images/blue-display.jpeg" },
         { name: "skin", image: "/images/skin.png"},
@@ -35,6 +37,7 @@ export const Products: Product[] = [
     quantity: 1,
     colors: [
       { name: "green", image: "/images/green-display.jpeg", default: true },
+            { name: "gray", image: "/images/4pgray.png"},
       { name: "black", image: "/images/black-display.jpeg" },
       { name: "blue", image: "/images/blue-display.jpeg" },
      { name: "Army Green", image: "/images/armygreen.png"},
@@ -56,6 +59,7 @@ export const Products: Product[] = [
     quantity: 1,
     colors: [
       { name: "blue", image: "/images/blue-display.jpeg", default: true },
+            { name: "gray", image: "/images/4pgray.png"},
       { name: "black", image: "/images/black-display.jpeg" },
         { name: "skin", image: "/images/skin.png"},
       { name: "Army Green", image: "/images/armygreen.png"},
@@ -64,11 +68,11 @@ export const Products: Product[] = [
     ]
   },
 
-    /*{
+    {
     id: "5",
     name: "Parachute Bike Cover",
     price: 1200 ,
-    image: "/images/silver-display.jpeg",
+    image: "/images/4pgray.png",
     category: "Parachute",
     description: ` Free delivery
  Open parcel allowed
@@ -76,15 +80,14 @@ export const Products: Product[] = [
  1-year warranty`,
     quantity: 1,
     colors: [
-      { name: "gray", image: "/images/silver-display.jpeg", default: true },
+      { name: "gray", image: "/images/4pgray.png", default: true },
       { name: "black", image: "/images/black-display.jpeg" },
       { name: "green", image: "/images/green-display.jpeg" },
       { name: "blue", image: "/images/blue-display.jpeg"},
-      { name: "silver", image: "/images/silver-display.jpeg"},
       { name: "darkBrown", image: "/images/brown-display.jpeg"},
       { name: "red", image: "/images/mahroon-display.jpeg"}
     ]
-  },*/
+  },
    {
     id: "6",
     name: "Parachute Bike Cover",
@@ -98,6 +101,7 @@ export const Products: Product[] = [
     quantity: 1,
     colors: [
       { name: "red", image: "/images/mahroon-display.jpeg", default: true },
+      { name: "gray", image: "/images/4pgray.png"},
       { name: "black", image: "/images/black-display.jpeg" },
       { name: "green", image: "/images/green-display.jpeg" },
       { name: "blue", image: "/images/blue-display.jpeg"},
