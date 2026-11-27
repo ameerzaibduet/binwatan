@@ -9,7 +9,14 @@
 //   { status: "call", ... } dial this customer
 
 import { NextRequest, NextResponse } from "next/server"
-import { getAdminClient, isAuthorized, unauthorized, toDialNumber } from "../_lib"
+import {
+  getAdminClient,
+  isAuthorized,
+  unauthorized,
+  toDialNumber,
+  startOfTodayPkt,
+  startOfTomorrowPkt,
+} from "../_lib"
 
 export const dynamic = "force-dynamic"
 
@@ -43,9 +50,11 @@ export async function GET(req: NextRequest) {
     const staleBefore = new Date(
       now.getTime() - STALE_CALL_MINUTES * 60000
     ).toISOString()
-    const retryAt = new Date(
-      now.getTime() + state.retry_after_minutes * 60000
-    ).toISOString()
+
+    // Each customer is called once per day: the next try is tomorrow, and
+    // anyone already called today is skipped until then.
+    const todayStartIso = new Date(startOfTodayPkt(now.getTime())).toISOString()
+    const retryAt = new Date(startOfTomorrowPkt(now.getTime())).toISOString()
 
     // Release anything stuck in "calling" (app crashed, phone died, etc.)
     await db
@@ -61,7 +70,7 @@ export async function GET(req: NextRequest) {
       .lt("last_call_at", staleBefore)
 
     // Next customer: in queue, pending or confirmed (never cancelled), not dispatched,
-    // attempts left, due now
+    // attempts left, due now, and not already called today
     const { data: candidates, error: candidateError } = await db
       .from("orders")
       .select("*")
@@ -71,6 +80,10 @@ export async function GET(req: NextRequest) {
       .in("call_status", ["not_called", "no_answer", "callback"])
       .lt("call_attempts", state.max_attempts)
       .or(`next_call_at.is.null,next_call_at.lte.${nowIso}`)
+      // Not called yet today (a customer who asked for a call back is the exception)
+      .or(
+        `last_call_at.is.null,last_call_at.lt.${todayStartIso},call_status.eq.callback`
+      )
       .order("next_call_at", { ascending: true, nullsFirst: true })
       .order("created_at", { ascending: true })
       .limit(1)

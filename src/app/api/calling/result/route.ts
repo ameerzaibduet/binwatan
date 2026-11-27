@@ -6,7 +6,12 @@
 // outcome: "answered" | "no_answer" | "rejected" | "failed" | "callback"
 
 import { NextRequest, NextResponse } from "next/server"
-import { getAdminClient, isAuthorized, unauthorized } from "../_lib"
+import {
+  getAdminClient,
+  isAuthorized,
+  unauthorized,
+  startOfTomorrowPkt,
+} from "../_lib"
 
 export const dynamic = "force-dynamic"
 
@@ -31,16 +36,6 @@ export async function POST(req: NextRequest) {
     }
 
     const db = getAdminClient()
-
-    const { data: state, error: stateError } = await db
-      .from("calling_state")
-      .select("*")
-      .eq("id", 1)
-      .single()
-
-    if (stateError) {
-      throw stateError
-    }
 
     const now = new Date()
     const nowIso = now.toISOString()
@@ -71,11 +66,10 @@ export async function POST(req: NextRequest) {
         next_call_at: null,
       }
     } else if (outcome === "no_answer" || outcome === "rejected") {
+      // One call per customer per day: try again tomorrow.
       orderUpdate = {
         call_status: "no_answer",
-        next_call_at: new Date(
-          now.getTime() + state.retry_after_minutes * 60000
-        ).toISOString(),
+        next_call_at: new Date(startOfTomorrowPkt(now.getTime())).toISOString(),
       }
     } else if (outcome === "callback") {
       const requested = callbackAt ? new Date(callbackAt) : null

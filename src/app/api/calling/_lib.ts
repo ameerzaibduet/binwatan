@@ -35,6 +35,23 @@ export function unauthorized() {
   )
 }
 
+// "Once a day" means once per Pakistan calendar day. Pakistan time is UTC+5
+// all year round (no daylight saving), so the day boundary is simple to compute.
+const PKT_OFFSET_MS = 5 * 60 * 60 * 1000
+const DAY_MS = 24 * 60 * 60 * 1000
+
+// Midnight (00:00 Pakistan time) at the start of today, in milliseconds.
+export function startOfTodayPkt(nowMs: number = Date.now()) {
+  const shifted = nowMs + PKT_OFFSET_MS
+
+  return shifted - (shifted % DAY_MS) - PKT_OFFSET_MS
+}
+
+// Midnight (00:00 Pakistan time) at the start of tomorrow, in milliseconds.
+export function startOfTomorrowPkt(nowMs: number = Date.now()) {
+  return startOfTodayPkt(nowMs) + DAY_MS
+}
+
 // 03001234567 -> +923001234567, 923001234567 -> +923001234567
 export function toDialNumber(phone: string) {
   const raw = String(phone || "").trim()

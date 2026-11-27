@@ -96,6 +96,83 @@ type OrderTypeFilter = "all" | "pending" | "confirmed"
 // phone = the Android app dials automatically; laptop = you click to dial from this computer
 type CallMode = "phone" | "laptop"
 
+// Who one of today's calls was to (loaded separately so booked orders still show)
+type CalledInfo = {
+  id: string
+  name: string
+  phone: string
+  city: string
+  total: number
+  order_status?: string | null
+  dispatched: boolean
+}
+
+type CalledFilter = "all" | "answered" | "no_answer" | "other"
+
+// "Once a day" means once per Pakistan calendar day (UTC+5, no daylight saving).
+const PKT_OFFSET_MS = 5 * 60 * 60 * 1000
+const DAY_MS = 24 * 60 * 60 * 1000
+
+// Midnight (00:00 Pakistan time) at the start of today, in milliseconds.
+function startOfTodayPkt(nowMs: number) {
+  const shifted = nowMs + PKT_OFFSET_MS
+
+  return shifted - (shifted % DAY_MS) - PKT_OFFSET_MS
+}
+
+// Midnight (00:00 Pakistan time) at the start of tomorrow, in milliseconds.
+function startOfTomorrowPkt(nowMs: number) {
+  return startOfTodayPkt(nowMs) + DAY_MS
+}
+
+function outcomeGroup(outcome: string): "answered" | "no_answer" | "other" {
+  if (outcome === "answered") {
+    return "answered"
+  }
+
+  if (outcome === "no_answer" || outcome === "rejected") {
+    return "no_answer"
+  }
+
+  return "other"
+}
+
+function formatTime(dateStr?: string | null) {
+  if (!dateStr) {
+    return "-"
+  }
+
+  return new Date(dateStr).toLocaleTimeString("en-PK", {
+    hour: "numeric",
+    minute: "2-digit",
+  })
+}
+
+function orderStateOf(info: CalledInfo) {
+  if (info.dispatched) {
+    return { label: "Booked", classes: "bg-sky-50 text-sky-700 border-sky-200" }
+  }
+
+  if (info.order_status === "confirmed") {
+    return {
+      label: "Confirmed",
+      classes: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    }
+  }
+
+  if (info.order_status === "cancelled") {
+    return {
+      label: "Cancelled",
+      classes: "bg-rose-50 text-rose-700 border-rose-200",
+    }
+  }
+
+  return {
+    label: "Pending",
+    classes: "bg-amber-50 text-amber-700 border-amber-200",
+  }
+}
+
 // 03001234567 -> +923001234567, 923001234567 -> +923001234567
 function toDialNumber(phone: string) {
   const raw = String(phone || "").trim()
@@ -160,6 +237,15 @@ function callStatusOf(order: QueueOrder): CallStatus {
 
 function isConfirmed(order: QueueOrder) {
   return order.order_status === "confirmed"
+}
+
+// Already called today (a customer who asked for a call back is the exception).
+function wasCalledToday(order: QueueOrder, todayStart: number) {
+  if (!order.last_call_at || callStatusOf(order) === "callback") {
+    return false
+  }
+
+  return new Date(order.last_call_at).getTime() >= todayStart
 }
 
 // ---- Booking helpers (same rules as the Dispatch Board) ----
@@ -309,8 +395,10 @@ export default function CallingQueuePage() {
   const [settingsDraft, setSettingsDraft] = useState<{
     ring: string
     attempts: string
-    retry: string
   } | null>(null)
+
+  const [calledInfo, setCalledInfo] = useState<Record<string, CalledInfo>>({})
+  const [calledFilter, setCalledFilter] = useState<CalledFilter>("all")
 
   function showMessage(text: string) {
     setMessage(text)
@@ -328,6 +416,11 @@ export default function CallingQueuePage() {
         setRefreshing(true)
       }
 
+      // Calls made since midnight today (Pakistan time)
+      const todayStartIso = new Date(
+        startOfTodayPkt(Date.now())
+      ).toISOString()
+
       const [ordersRes, stateRes, attemptsRes] = await Promise.all([
         supabaseClient
           .from("orders")
@@ -344,8 +437,9 @@ export default function CallingQueuePage() {
         supabaseClient
           .from("call_attempts")
           .select("*")
+          .gte("started_at", todayStartIso)
           .order("started_at", { ascending: false })
-          .limit(20),
+          .limit(1000),
       ])
 
       if (ordersRes.error) throw ordersRes.error
@@ -361,16 +455,42 @@ export default function CallingQueuePage() {
 
       const loadedState = stateRes.data as CallingState
 
+      const todayRows = (attemptsRes.data || []) as CallAttempt[]
+
+      // Who today's calls were to. Loaded by id so customers whose order is
+      // already booked (and no longer in the list above) still show their name.
+      const calledIds = Array.from(
+        new Set(todayRows.map((attempt) => String(attempt.order_id)))
+      )
+
+      const info: Record<string, CalledInfo> = {}
+
+      for (let i = 0; i < calledIds.length; i += 100) {
+        const { data: infoRows, error: infoError } = await supabaseClient
+          .from("orders")
+          .select("id,name,phone,city,total,order_status,dispatched")
+          .in("id", calledIds.slice(i, i + 100))
+
+        if (infoError) {
+          console.error("Could not load names for today's calls:", infoError)
+          break
+        }
+
+        for (const row of infoRows || []) {
+          info[String(row.id)] = row as CalledInfo
+        }
+      }
+
       setOrders(loadedOrders)
       setState(loadedState)
-      setAttempts((attemptsRes.data || []) as CallAttempt[])
+      setAttempts(todayRows)
+      setCalledInfo(info)
 
       setSettingsDraft(
         (current) =>
           current || {
             ring: String(loadedState.ring_timeout_seconds),
             attempts: String(loadedState.max_attempts),
-            retry: String(loadedState.retry_after_minutes),
           }
       )
     } catch (err: any) {
@@ -456,14 +576,17 @@ export default function CallingQueuePage() {
     [notInQueue]
   )
 
-  // Laptop mode: the customer who is due next (same order the phone app would use).
-  const nextDue = useMemo(() => {
-    const due = waitingToCall.filter(
-      (order) =>
-        !order.next_call_at || new Date(order.next_call_at).getTime() <= now
+  // Midnight today (Pakistan time). Based on `now` so it rolls over by itself.
+  const todayStart = startOfTodayPkt(now)
+
+  // Still to be called today, in the order they will be called (the same order
+  // the phone app uses). Anyone already called today is not in this list.
+  const remainingToday = useMemo(() => {
+    const list = waitingToCall.filter(
+      (order) => !wasCalledToday(order, todayStart)
     )
 
-    due.sort((a, b) => {
+    list.sort((a, b) => {
       const aTime = a.next_call_at ? new Date(a.next_call_at).getTime() : 0
       const bTime = b.next_call_at ? new Date(b.next_call_at).getTime() : 0
 
@@ -476,8 +599,56 @@ export default function CallingQueuePage() {
       )
     })
 
-    return due[0]
-  }, [waitingToCall, now])
+    return list
+  }, [waitingToCall, todayStart])
+
+  // Laptop mode: the customer who is due next.
+  const nextDue = useMemo(
+    () =>
+      remainingToday.find(
+        (order) =>
+          !order.next_call_at || new Date(order.next_call_at).getTime() <= now
+      ),
+    [remainingToday, now]
+  )
+
+  // Today's calls, one line per customer (latest call), for the counters.
+  const calledTodayStats = useMemo(() => {
+    const latest = new Map<string, CallAttempt>()
+
+    // attempts are newest first, so the first one seen per customer is the latest
+    for (const attempt of attempts) {
+      const key = String(attempt.order_id)
+
+      if (!latest.has(key)) {
+        latest.set(key, attempt)
+      }
+    }
+
+    let answered = 0
+    let noAnswer = 0
+
+    latest.forEach((attempt) => {
+      const group = outcomeGroup(attempt.outcome)
+
+      if (group === "answered") {
+        answered += 1
+      } else if (group === "no_answer") {
+        noAnswer += 1
+      }
+    })
+
+    return { total: latest.size, answered, noAnswer }
+  }, [attempts])
+
+  const visibleCalled = useMemo(
+    () =>
+      attempts.filter(
+        (attempt) =>
+          calledFilter === "all" || outcomeGroup(attempt.outcome) === calledFilter
+      ),
+    [attempts, calledFilter]
+  )
 
   const visibleOrders = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -642,8 +813,12 @@ export default function CallingQueuePage() {
   }
 
   function startQueue() {
-    if (waitingToCall.length === 0 && callingNow.length === 0) {
-      showError("Add orders to the queue before starting.")
+    if (remainingToday.length === 0 && callingNow.length === 0) {
+      showError(
+        queued.length === 0
+          ? "Add orders to the queue before starting."
+          : "Everyone in the queue has already been called today. They will be called again tomorrow."
+      )
       return
     }
 
@@ -1094,7 +1269,6 @@ export default function CallingQueuePage() {
     runAction(`finish-${order.id}`, async () => {
       const now = Date.now()
       const nowIso = new Date(now).toISOString()
-      const retryMinutes = state?.retry_after_minutes ?? 120
 
       // Close the latest open call record for this order.
       const { data: openAttempts, error: openError } = await supabaseClient
@@ -1127,7 +1301,8 @@ export default function CallingQueuePage() {
       } else if (outcome === "no_answer") {
         patch = {
           call_status: "no_answer",
-          next_call_at: new Date(now + retryMinutes * 60000).toISOString(),
+          // One call per customer per day: try again tomorrow.
+          next_call_at: new Date(startOfTomorrowPkt(now)).toISOString(),
         }
       } else if (outcome === "callback") {
         patch = {
@@ -1151,7 +1326,6 @@ export default function CallingQueuePage() {
 
     const ring = Number(settingsDraft.ring)
     const maxTries = Number(settingsDraft.attempts)
-    const retry = Number(settingsDraft.retry)
 
     if (!(ring >= 20 && ring <= 120)) {
       showError("Ring time must be between 20 and 120 seconds.")
@@ -1159,12 +1333,7 @@ export default function CallingQueuePage() {
     }
 
     if (!(maxTries >= 1 && maxTries <= 10)) {
-      showError("Attempts must be between 1 and 10.")
-      return
-    }
-
-    if (!(retry >= 5 && retry <= 1440)) {
-      showError("Retry delay must be between 5 and 1440 minutes.")
+      showError("Days of trying must be between 1 and 10.")
       return
     }
 
@@ -1174,7 +1343,6 @@ export default function CallingQueuePage() {
         .update({
           ring_timeout_seconds: ring,
           max_attempts: maxTries,
-          retry_after_minutes: retry,
           updated_at: new Date().toISOString(),
         })
         .eq("id", 1)
@@ -1315,8 +1483,8 @@ export default function CallingQueuePage() {
                   </span>
 
                   <span className="text-xs text-gray-500">
-                    Ring {state.ring_timeout_seconds}s · {state.max_attempts}{" "}
-                    attempts · retry after {state.retry_after_minutes} min
+                    Ring {state.ring_timeout_seconds}s · one call per customer
+                    per day · up to {state.max_attempts} days
                   </span>
                 </div>
 
@@ -1355,12 +1523,14 @@ export default function CallingQueuePage() {
                 )}
               </div>
 
-              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
                 {[
                   ["Not in queue", notInQueue.length, "text-gray-900"],
-                  ["Waiting to call", waitingToCall.length, "text-amber-600"],
+                  ["Remaining today", remainingToday.length, "text-amber-600"],
                   ["Calling now", callingNow.length, "text-sky-600"],
-                  ["Answered", answeredOrders.length, "text-emerald-600"],
+                  ["Called today", calledTodayStats.total, "text-gray-900"],
+                  ["Answered today", calledTodayStats.answered, "text-emerald-600"],
+                  ["No answer today", calledTodayStats.noAnswer, "text-orange-600"],
                   ["Gave up", gaveUp.length, "text-rose-600"],
                 ].map(([label, value, color]) => (
                   <div key={label as string} className="rounded-lg bg-gray-50 p-3">
@@ -1567,16 +1737,19 @@ export default function CallingQueuePage() {
                   </div>
                 ) : (
                   <div className="rounded-xl border border-dashed border-gray-300 bg-white p-5 text-center text-sm text-gray-500">
-                    No one is due for a call right now. Add orders to the queue
-                    below.
+                    {queued.length > 0
+                      ? "Everyone in the queue has been called today. The rest will be called tomorrow."
+                      : "No one is due for a call right now. Add orders to the queue below."}
                   </div>
                 )
               ) : (
                 <div className="rounded-xl border border-dashed border-gray-300 bg-white p-5 text-center text-sm text-gray-500">
                   {running
-                    ? waitingToCall.length > 0
+                    ? remainingToday.length > 0
                       ? "Waiting for the phone app to pick up the next customer..."
-                      : "No one is due for a call right now."
+                      : queued.length > 0
+                        ? "Everyone in the queue has been called today. The rest will be called tomorrow."
+                        : "No one is due for a call right now."
                     : pausedByAnswer
                       ? "Queue stopped because a customer answered. Handle them below, then press Start Calling to continue."
                       : "Queue is stopped. Add orders below and press Start Calling."}
@@ -1889,55 +2062,181 @@ export default function CallingQueuePage() {
               )}
             </div>
 
-            {/* RECENT CALLS */}
+            {/* REMAINING TODAY + CALLED TODAY (kept apart so you can see what is left) */}
 
-            <div className="mb-5 rounded-xl border bg-white shadow-sm">
-              <div className="border-b px-4 py-3 font-bold text-gray-900">
-                Recent calls
+            <div className="mb-5 grid gap-4 lg:grid-cols-2">
+
+              {/* Remaining */}
+
+              <div className="rounded-xl border bg-white shadow-sm">
+                <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
+                  <span className="font-bold text-gray-900">
+                    Remaining to call today
+                  </span>
+
+                  <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700">
+                    {remainingToday.length} left
+                  </span>
+                </div>
+
+                {remainingToday.length === 0 ? (
+                  <div className="p-6 text-center text-sm text-gray-500">
+                    {queued.length === 0
+                      ? "Nobody is in the queue."
+                      : "Everyone in the queue has been called today."}
+                  </div>
+                ) : (
+                  <div className="max-h-[440px] divide-y overflow-y-auto">
+                    {remainingToday.map((order, index) => (
+                      <div
+                        key={order.id}
+                        className="flex items-start gap-3 px-4 py-2.5 text-sm"
+                      >
+                        <span className="w-6 shrink-0 pt-0.5 text-xs font-bold text-gray-400">
+                          {index + 1}
+                        </span>
+
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-gray-900">
+                            {order.name}
+                          </p>
+
+                          <p className="text-xs text-gray-500">
+                            <span className="font-semibold text-blue-700">
+                              {order.phone}
+                            </span>{" "}
+                            · {order.city}
+                          </p>
+                        </div>
+
+                        <div className="shrink-0 text-right">
+                          <p className="text-xs font-black text-gray-900">
+                            Rs. {formatPrice(order.total)}
+                          </p>
+
+                          {isConfirmed(order) && (
+                            <p className="text-[11px] font-semibold text-emerald-700">
+                              Confirmed
+                            </p>
+                          )}
+
+                          {Number(order.call_attempts || 0) > 0 && (
+                            <p className="text-[11px] text-gray-500">
+                              Tried {Number(order.call_attempts)} of {maxAttempts}{" "}
+                              days
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              {attempts.length === 0 ? (
-                <div className="p-6 text-center text-sm text-gray-500">
-                  No calls yet.
+              {/* Called today */}
+
+              <div className="rounded-xl border bg-white shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
+                  <span className="font-bold text-gray-900">
+                    Called today{" "}
+                    <span className="text-xs font-normal text-gray-400">
+                      ·{" "}
+                      {new Date(now).toLocaleDateString("en-PK", {
+                        weekday: "short",
+                        day: "numeric",
+                        month: "short",
+                        timeZone: "Asia/Karachi",
+                      })}
+                    </span>
+                  </span>
+
+                  <select
+                    value={calledFilter}
+                    onChange={(e) =>
+                      setCalledFilter(e.target.value as CalledFilter)
+                    }
+                    className="h-8 rounded-lg border border-gray-200 bg-white px-2 text-xs font-semibold text-gray-700 outline-none"
+                  >
+                    <option value="all">All calls</option>
+                    <option value="answered">Answered</option>
+                    <option value="no_answer">No answer</option>
+                    <option value="other">Other</option>
+                  </select>
                 </div>
-              ) : (
-                <div className="divide-y">
-                  {attempts.map((attempt) => {
-                    const order = ordersById.get(String(attempt.order_id))
 
-                    return (
-                      <div
-                        key={attempt.id}
-                        className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2.5 text-sm"
-                      >
-                        <span className="w-28 text-xs text-gray-500">
-                          {formatWhen(attempt.started_at)}
-                        </span>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 border-b bg-gray-50 px-4 py-2 text-xs font-semibold">
+                  <span className="text-gray-700">
+                    {calledTodayStats.total} called
+                  </span>
 
-                        <span className="font-semibold text-gray-900">
-                          {order?.name || attempt.phone}
-                        </span>
+                  <span className="text-emerald-700">
+                    {calledTodayStats.answered} answered
+                  </span>
 
-                        <span className="text-xs text-gray-500">
-                          {order ? attempt.phone : ""} · attempt{" "}
-                          {attempt.attempt_number}
-                        </span>
+                  <span className="text-orange-600">
+                    {calledTodayStats.noAnswer} no answer
+                  </span>
+                </div>
 
-                        <span
-                          className={`ml-auto text-xs font-bold uppercase ${
-                            OUTCOME_CLASSES[attempt.outcome] || "text-gray-600"
-                          }`}
+                {visibleCalled.length === 0 ? (
+                  <div className="p-6 text-center text-sm text-gray-500">
+                    {attempts.length === 0
+                      ? "No calls made yet today."
+                      : "No calls match this filter."}
+                  </div>
+                ) : (
+                  <div className="max-h-[440px] divide-y overflow-y-auto">
+                    {visibleCalled.map((attempt) => {
+                      const info = calledInfo[String(attempt.order_id)]
+                      const orderState = info ? orderStateOf(info) : null
+
+                      return (
+                        <div
+                          key={attempt.id}
+                          className="flex items-start gap-3 px-4 py-2.5 text-sm"
                         >
-                          {attempt.outcome.replace("_", " ")}
-                          {attempt.talk_seconds > 0
-                            ? ` · ${attempt.talk_seconds}s`
-                            : ""}
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
+                          <span className="w-16 shrink-0 pt-0.5 text-xs text-gray-500">
+                            {formatTime(attempt.started_at)}
+                          </span>
+
+                          <div className="min-w-0 flex-1">
+                            <p className="font-semibold text-gray-900">
+                              {info?.name || attempt.phone}
+                            </p>
+
+                            <p className="text-xs text-gray-500">
+                              {attempt.phone}
+                              {info?.city ? ` · ${info.city}` : ""}
+                            </p>
+                          </div>
+
+                          <div className="flex shrink-0 flex-col items-end gap-1">
+                            <span
+                              className={`text-xs font-bold uppercase ${
+                                OUTCOME_CLASSES[attempt.outcome] ||
+                                "text-gray-600"
+                              }`}
+                            >
+                              {attempt.outcome.replace("_", " ")}
+                              {attempt.talk_seconds > 0
+                                ? ` · ${attempt.talk_seconds}s`
+                                : ""}
+                            </span>
+
+                            {orderState && (
+                              <span
+                                className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${orderState.classes}`}
+                              >
+                                {orderState.label}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* SETTINGS */}
@@ -1949,7 +2248,7 @@ export default function CallingQueuePage() {
                   Calling rules
                 </h2>
 
-                <div className="grid gap-3 sm:grid-cols-3">
+                <div className="grid gap-3 sm:grid-cols-2">
                   <div>
                     <label className="mb-1 block text-xs font-semibold text-gray-600">
                       Ring time (seconds)
@@ -1969,7 +2268,7 @@ export default function CallingQueuePage() {
 
                   <div>
                     <label className="mb-1 block text-xs font-semibold text-gray-600">
-                      Max attempts per customer
+                      Days to keep trying each customer (one call per day)
                     </label>
                     <input
                       type="number"
@@ -1984,22 +2283,6 @@ export default function CallingQueuePage() {
                     />
                   </div>
 
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold text-gray-600">
-                      Retry after (minutes)
-                    </label>
-                    <input
-                      type="number"
-                      value={settingsDraft.retry}
-                      onChange={(e) =>
-                        setSettingsDraft({
-                          ...settingsDraft,
-                          retry: e.target.value,
-                        })
-                      }
-                      className="h-10 w-full rounded-lg border px-3 text-sm outline-none focus:border-orange-400"
-                    />
-                  </div>
                 </div>
 
                 <button
